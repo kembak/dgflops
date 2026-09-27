@@ -1,5 +1,7 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { createClient, type Client } from "@libsql/client";
+import { mkdirSync } from "node:fs";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 
 export type UserRecord = {
   id: string; username: string | null; passwordHash: string | null; salt: string | null; guest: boolean;
@@ -15,55 +17,46 @@ export type State = { users: Record<string, UserRecord>; sessions: Record<string
   rooms: Record<string, RoomRecord>; messages: MessageRecord[] };
 
 const empty = (): State => ({ users: {}, sessions: {}, ledger: [], achievements: [], rooms: {}, messages: [] });
-const localPath = join(process.cwd(), "data", "dgflops.json");
-const remoteUrl = process.env.UPSTASH_REDIS_REST_URL;
-const remoteToken = process.env.UPSTASH_REDIS_REST_TOKEN;
-const remoteKey = "dgflops:state:v1";
-let localQueue = Promise.resolve();
+const localDirectory = join(process.cwd(), "data");
+const remoteUrl = process.env.FLOPSTORAGE_TURSO_DATABASE_URL;
+const remoteToken = process.env.FLOPSTORAGE_TURSO_AUTH_TOKEN;
+let client: Client | undefined;
+let schemaReady: Promise<void> | undefined;
 
-function configuration(): "remote" | "local" {
-  if (remoteUrl && remoteToken) return "remote";
-  if (process.env.VERCEL) throw new Error("Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN in Vercel.");
-  return "local";
-}
-
-async function redis(command: (string | number)[]): Promise<unknown> {
-  const response = await fetch(remoteUrl!, { method: "POST", headers: { authorization: `Bearer ${remoteToken}`, "content-type": "application/json" },
-    body: JSON.stringify(command), cache: "no-store" });
-  if (!response.ok) throw new Error(`Data service error (${response.status}).`);
-  const result = await response.json() as { result?: unknown; error?: string };
-  if (result.error) throw new Error(`Data service error: ${result.error}`);
-  return result.result;
-}
-
-async function snapshot(): Promise<{ raw: string; state: State }> {
-  let raw = "";
-  if (configuration() === "remote") raw = String(await redis(["GET", remoteKey]) || "");
+function database(): Client {
+  if (client) return client;
+  if (Boolean(remoteUrl) !== Boolean(remoteToken) || (process.env.VERCEL && !remoteUrl)) {
+    throw new Error("Set FLOPSTORAGE_TURSO_DATABASE_URL and FLOPSTORAGE_TURSO_AUTH_TOKEN together.");
+  }
+  if (remoteUrl && remoteToken) client = createClient({ url: remoteUrl, authToken: remoteToken });
   else {
-    try { raw = await readFile(localPath, "utf8"); }
-    catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+    mkdirSync(localDirectory, { recursive: true });
+    client = createClient({ url: `file:${join(localDirectory, "dgflops.sqlite")}` });
   }
-  return { raw, state: raw ? JSON.parse(raw) as State : empty() };
+  return client;
 }
 
-async function compareAndSet(before: string, after: string): Promise<boolean> {
-  if (configuration() === "remote") {
-    const script = "local current=redis.call('GET',KEYS[1]); if (current or '') ~= ARGV[1] then return 0 end; redis.call('SET',KEYS[1],ARGV[2]); return 1";
-    return Number(await redis(["EVAL", script, 1, remoteKey, before, after])) === 1;
-  }
-  const previous = localQueue;
-  let release!: () => void;
-  localQueue = new Promise<void>((done) => { release = done; });
-  await previous;
-  try {
-    let current = "";
-    try { current = await readFile(localPath, "utf8"); }
-    catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
-    if (current !== before) return false;
-    await mkdir(dirname(localPath), { recursive: true });
-    await writeFile(localPath, after, "utf8");
-    return true;
-  } finally { release(); }
+async function ready(): Promise<void> {
+  if (!schemaReady) schemaReady = (async () => {
+    const db = database();
+    await db.execute("CREATE TABLE IF NOT EXISTS app_state (id INTEGER PRIMARY KEY CHECK (id = 1), data TEXT NOT NULL)");
+    const existing = await db.execute("SELECT id FROM app_state WHERE id = 1");
+    if (existing.rows.length) return;
+    let state = empty();
+    // Existing local JSON remains untouched and is imported once into local SQLite.
+    if (!remoteUrl) {
+      try { state = JSON.parse(await readFile(join(localDirectory, "dgflops.json"), "utf8")) as State; }
+      catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+    }
+    await db.execute({ sql: "INSERT OR IGNORE INTO app_state (id, data) VALUES (1, ?)", args: [JSON.stringify(state)] });
+  })().catch((error) => { schemaReady = undefined; throw error; });
+  await schemaReady;
+}
+
+async function snapshot(): Promise<State> {
+  await ready();
+  const result = await database().execute("SELECT data FROM app_state WHERE id = 1");
+  return JSON.parse(String(result.rows[0].data)) as State;
 }
 
 export function utcDay(date = new Date()): string { return date.toISOString().slice(0, 10); }
@@ -80,20 +73,24 @@ function resetWallets(state: State): boolean {
 }
 
 export async function mutate<T>(fn: (state: State) => T): Promise<T> {
-  for (let attempt = 0; attempt < 12; attempt++) {
-    const { raw, state } = await snapshot();
+  await ready();
+  const tx = await database().transaction("write");
+  try {
+    const resultSet = await tx.execute("SELECT data FROM app_state WHERE id = 1");
+    const state = JSON.parse(String(resultSet.rows[0].data)) as State;
     resetWallets(state);
     const result = fn(state);
-    if (await compareAndSet(raw, JSON.stringify(state))) return result;
-  }
-  throw new Error("The table is busy. Please try again.");
+    await tx.execute({ sql: "UPDATE app_state SET data = ? WHERE id = 1", args: [JSON.stringify(state)] });
+    await tx.commit();
+    return result;
+  } finally { tx.close(); }
 }
 
 export async function read<T>(fn: (state: State) => T): Promise<T> {
   const first = await snapshot();
-  if (Object.values(first.state.users).some((user) => user.resetDay !== utcDay())) {
+  if (Object.values(first.users).some((user) => user.resetDay !== utcDay())) {
     await mutate(() => undefined);
-    return fn((await snapshot()).state);
+    return fn(await snapshot());
   }
-  return fn(first.state);
+  return fn(first);
 }

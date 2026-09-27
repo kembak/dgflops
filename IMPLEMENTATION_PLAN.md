@@ -5,7 +5,7 @@ This file tracks the work toward the first playable release described in `docs/P
 ## 1. Foundation and rules — in progress
 
 - [x] Inspect the starter and read the project guidance.
-- [ ] Add persistent database, account sessions, daily reset, ledger, and XP achievements.
+- [x] Add transactional Turso persistence with local SQLite fallback, account sessions, daily reset, ledger, and XP achievements.
 - [ ] Implement and test cards, poker ranking, betting, and house game resolution as pure modules.
 
 ## 2. Play and social systems — pending
@@ -24,7 +24,7 @@ This file tracks the work toward the first playable release described in `docs/P
 
 ## Decisions
 
-- Use a hosted Redis REST store for Vercel and a local file store for development, both behind one transactional state interface. Package installation is currently blocked by automatic approval review, so the remote adapter will use built-in `fetch`.
+- Use Turso/libSQL on Vercel with the `FLOPSTORAGE_` integration variables and local SQLite without credentials. The existing state snapshot is stored in one `app_state` row; a database write transaction serializes all state changes. Normalize high-volume tables if this becomes a scaling bottleneck.
 - Poll HTTP endpoints for multiplayer updates so Vercel functions can serve the application without a long-lived socket server.
 - The server decides cards, legal actions, chip changes, achievements, and rank XP. Guests can only use solo house games; their chips are local to their browser and do not enter rankings.
 - Daily wallet reset is 10,000 chips at 00:00 UTC. Game profit/loss and earned achievement XP survive resets.
