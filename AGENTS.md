@@ -22,7 +22,7 @@ Use two-space indentation, functional React components, `camelCase` variables/fu
 
 ## Economy, Audio & Safety
 
-Reset accounts to 10,000 chips at 00:00 UTC, preserving profit/loss and achievements. Weekly and all-time XP equals signed game net chips plus achievement XP; grants and resets are not profit. Use only web-licensed audio and provide separate music/effects controls.
+Reset accounts to 10,000 chips at 00:00 UTC, preserving profit/loss and achievements. Weekly and all-time XP equals signed game net chips plus achievement XP; grants and resets are not profit. Put only web-licensed music in `public/music/`; `predev`/`prebuild` generate its catalog and metadata. Never add external-stream URLs. Keep separate persistent music/effects controls.
 
 ## Commits & Pull Requests
 

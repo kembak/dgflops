@@ -5,7 +5,7 @@ import { useState, type FormEvent } from "react";
 import { useApp } from "./AppContext";
 
 export function SiteHeader() {
-  const { user, authenticate, error, music, effects, toggleMusic, toggleEffects } = useApp();
+  const { user, authenticate, error } = useApp();
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"login" | "register">("login");
   const [username, setUsername] = useState("");
@@ -24,8 +24,6 @@ export function SiteHeader() {
       <Link className="brand" href="/"><span className="brand-mark">DG</span><span>FLOPS<span className="brand-dot">.</span></span></Link>
       <nav className="main-nav" aria-label="Main navigation"><Link href="/">Lobby</Link><Link href="/leaderboard">Leaderboard</Link><Link href="/profile">Achievements</Link></nav>
       <div className="header-actions">
-        <button className="icon-button" onClick={toggleMusic} aria-label={music ? "Mute music" : "Play music"} title="Lobby music">{music ? "♫ On" : "♫ Off"}</button>
-        <button className="icon-button" onClick={toggleEffects} aria-label={effects ? "Mute effects" : "Enable effects"} title="Sound effects">{effects ? "♪ On" : "♪ Off"}</button>
         {user ? <span className="chip-pill">◈ {user.chips.toLocaleString()}</span> : null}
         <button className="account-button" onClick={() => setOpen(true)}>{user ? user.username : "Sign in"}</button>
       </div>

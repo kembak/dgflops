@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { api, useApp } from "@/components/AppContext";
 import type { Card } from "@/lib/games/cards";
@@ -15,14 +15,20 @@ const names: Record<string, string> = { blackjack: "Blackjack", baccarat: "Bacca
 const rank = (value: number) => ({ 11: "J", 12: "Q", 13: "K", 14: "A" } as Record<number, string>)[value] || value;
 
 function Cards({ cards, hidden = 0 }: { cards: Card[]; hidden?: number }) {
-  return <span className="card-row">{cards.map((card, index) => <span className={`playing-card ${card.suit === "♥" || card.suit === "♦" ? "red-card" : ""}`} key={`${card.suit}-${card.rank}-${index}`}>{rank(card.rank)}<small>{card.suit}</small></span>)}
-    {Array.from({ length: hidden }, (_, index) => <span className="playing-card card-back" key={`hidden-${index}`}>DG</span>)}</span>;
+  return <span className="card-row">{cards.map((card, index) => <span className={`playing-card ${card.suit === "♥" || card.suit === "♦" ? "red-card" : ""}`} style={{ "--deal-index": index } as CSSProperties} key={`${card.suit}-${card.rank}-${index}`}>{rank(card.rank)}<small>{card.suit}</small></span>)}
+    {Array.from({ length: hidden }, (_, index) => <span className="playing-card card-back" style={{ "--deal-index": cards.length + index } as CSSProperties} key={`hidden-${index}`}>DG</span>)}
+    {!cards.length && !hidden && <span className="card-slot" aria-hidden="true" />}</span>;
+}
+
+function cardCount(state: HouseState | PokerState): number {
+  if (state.kind === "poker") return state.board.length + state.players.reduce((sum, player) => sum + player.hole.length, 0);
+  return state.dealer.length + state.board.length + Object.values(state.hands).reduce((sum, hand) => sum + hand.length, 0);
 }
 
 export default function RoomPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const { user, ready, refresh, sound } = useApp();
+  const { user, ready, refresh, sound, setAudioZone } = useApp();
   const [room, setRoom] = useState<Room | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -31,7 +37,21 @@ export default function RoomPage() {
   const [raise, setRaise] = useState(40);
   const [message, setMessage] = useState("");
   const tickBusy = useRef(false);
+  const lastCards = useRef<number | null>(null);
   const userId = user?.id;
+
+  const game = room?.game;
+  useEffect(() => { if (game) setAudioZone(game); }, [game, setAudioZone]);
+
+  useEffect(() => {
+    if (!room) return;
+    const count = cardCount(room.state);
+    const previous = lastCards.current;
+    lastCards.current = count;
+    if (previous === null || count <= previous) return;
+    const timers = Array.from({ length: Math.min(count - previous, 6) }, (_, index) => setTimeout(() => sound("card"), 80 + index * 105));
+    return () => timers.forEach(clearTimeout);
+  }, [room, sound]);
 
   useEffect(() => {
     if (!userId) return;
@@ -57,8 +77,12 @@ export default function RoomPage() {
       const result = await api<Room>(`/api/rooms/${id}`, { action: name, ...extra });
       setRoom(result);
       if (["bet", "raise", "call", "double", "rebuy"].includes(name)) sound("chip");
-      else if (["start", "hit", "next"].includes(name)) sound("card");
-      if (result.state.phase === "finished" || result.state.phase === "complete") sound("win");
+      if (room?.state.phase !== result.state.phase && ["finished", "complete"].includes(result.state.phase) && result.seated && user) {
+        const winning = result.state.kind === "house"
+          ? Number(result.state.result.split(" · ").find((entry) => entry.startsWith(`${user.username}: `))?.split(": ")[1] || 0) > 0
+          : result.state.message.split(" · ").some((entry) => entry.startsWith(`${user.username} won `) || entry.startsWith(`${user.username} wins `));
+        sound(winning ? "win" : "lose");
+      }
       await refresh();
       if (name === "leave") router.push("/");
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Action failed."); }
@@ -83,7 +107,9 @@ export default function RoomPage() {
         <section className="table-main">
           <div className="felt-table">
             <div className="table-topline"><span>DG FLOPS · {room.state.kind === "house" ? `ROUND ${room.state.round}` : `HAND ${room.state.hand}`}</span><span>{room.state.phase.toUpperCase()}</span></div>
+            <div className="table-deck" aria-hidden="true"><span>DG</span><span>DG</span></div>
             {room.state.kind === "house" ? <HouseDisplay state={room.state} userId={user.id} /> : <PokerDisplay state={room.state} userId={user.id} />}
+            <div className="table-felt-footer"><span>PLAY FOR THE MOMENT</span><span>FUN CHIPS ONLY</span></div>
           </div>
           <div className="table-status" role="status">{room.state.kind === "house" ? room.state.result : room.state.message}</div>
           {error && <p className="form-error" role="alert">{error}</p>}
@@ -108,17 +134,18 @@ export default function RoomPage() {
 }
 
 function HouseDisplay({ state, userId }: { state: HouseState; userId: string }) {
-  if (state.game === "baccarat") return <div className="board-display"><div><span>PLAYER</span><Cards cards={state.hands.player || []} /></div><div><span>BANKER</span><Cards cards={state.hands.banker || []} /></div></div>;
-  return <><div className="dealer-display"><span>DEALER</span><Cards cards={state.dealer} hidden={state.game === "blackjack" && state.phase === "playing" ? 1 : 0} /></div>
-    {state.game === "ultimate" && <div className="community-cards"><span>BOARD {state.stage?.toUpperCase()}</span><Cards cards={state.board} /></div>}
-    <div className="player-hands">{state.seats.filter((seat) => state.bets[seat.id]).map((seat) => <div className={`hand-line ${state.turn === seat.id ? "active-hand" : ""}`} key={seat.id}><span>{seat.name}{seat.id === userId ? " · YOU" : ""}</span><Cards cards={state.hands[seat.id] || []} hidden={state.game === "ultimate" && seat.id !== userId && state.phase !== "finished" ? 2 : 0} /><small>◈ {state.bets[seat.id].amount.toLocaleString()}</small></div>)}</div>
+  if (state.game === "baccarat") return <><div className="baccarat-betting-rail"><span>PLAYER</span><span>TIE</span><span>BANKER</span></div><div className="board-display"><div className="table-card-zone"><span>PLAYER HAND</span><Cards cards={state.hands.player || []} /></div><div className="table-card-zone"><span>BANKER HAND</span><Cards cards={state.hands.banker || []} /></div></div><div className="table-bet-spots"><span>PLAYER 1:1</span><span>TIE 8:1</span><span>BANKER 0.95:1</span></div></>;
+  return <><div className="dealer-display table-card-zone"><span>DEALER</span><Cards cards={state.dealer} hidden={state.game === "blackjack" && state.phase === "playing" ? 1 : 0} /></div>
+    {state.game === "ultimate" && <div className="community-cards table-card-zone"><span>COMMUNITY BOARD {state.stage?.toUpperCase()}</span><Cards cards={state.board} hidden={Math.max(0, 5 - state.board.length)} /></div>}
+    <div className="table-bet-spots"><span>{state.game === "blackjack" ? "BLACKJACK PAYS 3:2" : "ANTE"}</span><span>{state.game === "blackjack" ? "DEALER STANDS ON 17" : "BLIND"}</span><span>{state.game === "blackjack" ? "BETTING CIRCLE" : "PLAY"}</span></div>
+    <div className="player-hands">{state.seats.filter((seat) => state.bets[seat.id]).map((seat) => <div className={`hand-line ${state.turn === seat.id ? "active-hand" : ""}`} key={seat.id}><span>{seat.name}{seat.id === userId ? " · YOU" : ""}</span><Cards key={`${state.round}-${seat.id}`} cards={state.hands[seat.id] || []} hidden={state.game === "ultimate" && seat.id !== userId && state.phase !== "finished" ? 2 : 0} /><small><i className="mini-chip" /> {state.bets[seat.id].amount.toLocaleString()}</small></div>)}</div>
   </>;
 }
 
 function PokerDisplay({ state, userId }: { state: PokerState; userId: string }) {
-  return <><div className="pot-display">POT <strong>◈ {state.pot.toLocaleString()}</strong></div><div className="community-cards"><Cards cards={state.board} hidden={state.phase !== "waiting" && state.phase !== "finished" && state.phase !== "complete" ? 5 - state.board.length : 0} /></div>
+  return <><div className="pot-display"><span className="pot-chip-stack" aria-hidden="true" />POT <strong>{state.pot.toLocaleString()} CHIPS</strong></div><div className="community-cards table-card-zone"><span>COMMUNITY CARDS</span><Cards cards={state.board} hidden={state.phase !== "waiting" && state.phase !== "finished" && state.phase !== "complete" ? 5 - state.board.length : 0} /></div><div className="poker-betting-line"><span>SMALL BLIND 10</span><span>BIG BLIND 20</span><span>{state.mode === "tournament" ? "TOURNAMENT" : "CHIP TABLE"}</span></div>
     <div className="player-hands">{state.players.map((player) => <div className={`hand-line ${state.turn === player.id ? "active-hand" : ""} ${player.folded ? "folded-hand" : ""}`} key={player.id}>
-      <span>{player.name}{player.id === userId ? " · YOU" : ""}</span><Cards cards={player.hole} hidden={player.hole.length === 0 && state.started && !["waiting", "complete"].includes(state.phase) && !player.folded ? state.game === "omaha" ? 4 : 2 : 0} />
+      <span>{player.name}{player.id === userId ? " · YOU" : ""}</span><Cards key={`${state.hand}-${player.id}`} cards={player.hole} hidden={player.hole.length === 0 && state.started && !["waiting", "complete"].includes(state.phase) && !player.folded ? state.game === "omaha" ? 4 : 2 : 0} />
       <small>{player.lastAction || `◈ ${player.stack.toLocaleString()}`}</small></div>)}</div>
   </>;
 }

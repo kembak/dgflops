@@ -31,3 +31,9 @@ FLOPSTORAGE_TURSO_AUTH_TOKEN
 The connected Turso database is initialized automatically on the first server request. Never prefix these variables with `NEXT_PUBLIC_` or commit their values. To test Turso locally, pull the Vercel development environment with `vercel env pull .env.local` (Vercel CLI login required), then run `npm run dev`. Without that file, local SQLite remains usable. Vercel deployments must not use filesystem persistence. Redeploy after changing environment variables.
 
 Contributor conventions are in [AGENTS.md](AGENTS.md).
+
+## Music and sound
+
+Add web-licensed MP3, M4A, OGG, or WAV files to the single music folder, `public/music/`. The `predev` and `prebuild` scripts scan it and generate `src/lib/music-catalog.json`; restart the dev server after adding files. No external music is fetched. ID3/container title, artist, and embedded cover art are read when available; filenames provide a fallback. The player shows a small DG cover when artwork is absent.
+
+Prefix filenames to assign playlists: `lobby--evening.mp3`, `blackjack--midnight.mp3`, `baccarat--track.mp3`, `ultimate--track.mp3`, `holdem--track.mp3`, or `omaha--track.mp3`. Files named `all--track.mp3` or without a recognized prefix play in every area. To change a playlist, rename or replace files in this folder and rebuild. The current track continues across routes if it belongs to both playlists; otherwise the player fades between tracks. Music and sound effects default on, with separate saved volume controls. Browsers may wait for the first user interaction before starting music.

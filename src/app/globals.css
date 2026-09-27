@@ -176,3 +176,58 @@ input:focus-visible, select:focus-visible, button:focus-visible, a:focus-visible
 @media (max-width: 1100px) { .main-nav { gap: 10px; } .table-layout { grid-template-columns: 1fr; } .table-sidebar { grid-template-columns: 1fr 1fr; } .achievement-grid { grid-template-columns: repeat(3, 1fr); } }
 @media (max-width: 760px) { .app-header { flex-wrap: wrap; padding: 16px 0; gap: 14px; } .main-nav { order: 3; width: 100%; justify-content: space-between; } .header-actions { margin-left: auto; } .icon-button { padding: 8px; } .chip-pill { display: none; } .lobby-lower { grid-template-columns: 1fr; } .stat-grid { grid-template-columns: repeat(2, 1fr); } .leaderboard-head, .leaderboard-row { grid-template-columns: 1.5fr 1fr .7fr; } .leaderboard-head span:nth-child(3), .leaderboard-row > span:nth-child(3) { display: none; } .table-sidebar { grid-template-columns: 1fr; } .felt-table { border-radius: 90px; min-height: 430px; padding: 18px; } .board-display { gap: 12px; } }
 @media (max-width: 500px) { .header-actions { gap: 4px; } .account-button { max-width: 100px; overflow: hidden; text-overflow: ellipsis; } .game-tile .tile-bottom strong { font-size: 26px; } .achievement-grid { grid-template-columns: 1fr 1fr; } .table-heading { display: block; } .table-code { margin-top: 15px; } .felt-table { border-width: 7px; border-radius: 55px; padding: 14px 7px; } .playing-card { width: 38px; height: 55px; font-size: 17px; } .playing-card small { font-size: 14px; } .card-row { min-height: 55px; } .hand-line { min-width: 90px; } .room-list-item { grid-template-columns: 1fr auto; } .room-phase { display: none; } }
+
+/* Table hardware and play zones stay decorative; the server still owns every game action. */
+.felt-table { position: relative; isolation: isolate; overflow: hidden; border-color: #654b34; background: radial-gradient(ellipse at 50% 36%, #277e69 0, #1b6758 42%, #0d403b 78%, #092925 100%); box-shadow: inset 0 0 0 3px #d7b682a8, inset 0 0 0 10px #07372d, inset 0 0 80px #031b17, 0 28px 60px #0009, 0 5px 0 #aa7950; }
+.felt-table::before { content: ""; position: absolute; inset: 27px; border: 2px solid #d7e4b84d; border-radius: inherit; pointer-events: none; z-index: -1; }
+.felt-table::after { content: "DG FLOPS"; position: absolute; left: 50%; top: 43%; transform: translate(-50%, -50%); font: 900 clamp(32px, 5vw, 72px)/1 Georgia, serif; letter-spacing: -.08em; white-space: nowrap; color: #e6f6d80d; pointer-events: none; z-index: -1; }
+.table-topline, .table-felt-footer { position: relative; z-index: 1; display: flex; justify-content: space-between; gap: 12px; color: #e8f1d9a9; font-size: 10px; font-weight: 900; letter-spacing: .18em; }
+.table-felt-footer { margin: 24px 42px 5px; font-size: 9px; }
+.table-deck { position: absolute; top: 64px; right: 10%; width: 44px; height: 61px; filter: drop-shadow(0 7px 5px #001d18a1); }
+.table-deck span { position: absolute; display: grid; place-items: center; width: 44px; height: 61px; border: 3px solid #e7edd7; border-radius: 5px; background: repeating-linear-gradient(45deg, #1b6156 0 4px, #2b8771 5px 8px); color: #e8dfbb; font: 900 13px Georgia, serif; }
+.table-deck span:first-child { transform: translate(5px, -4px) rotate(7deg); }
+.table-card-zone { width: fit-content; max-width: 100%; min-width: 125px; padding: 10px 20px 12px; border: 1px solid #e5efcf36; border-radius: 32px; background: #063d3845; box-shadow: inset 0 1px #ffffff14; }
+.dealer-display { margin-top: 62px; }
+.community-cards { margin-top: 42px; }
+.board-display { margin-top: 100px; align-items: start; }
+.board-display > div { margin: 0; }
+.baccarat-betting-rail, .table-bet-spots, .poker-betting-line { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; text-align: center; }
+.baccarat-betting-rail { margin: 35px 0 0; }
+.baccarat-betting-rail span { min-width: 105px; padding: 8px; border: 1px solid #eddfba70; border-radius: 80px; color: #f2e4bd; font-size: 10px; font-weight: 900; letter-spacing: .15em; }
+.table-bet-spots { margin: 30px auto 4px; }
+.table-bet-spots span { display: grid; place-items: center; min-width: 110px; min-height: 42px; padding: 8px 15px; border: 1px solid #e3e9c37d; border-radius: 50%; color: #e2edca; background: #d3e5c20c; font-size: 9px; font-weight: 900; letter-spacing: .1em; }
+.poker-betting-line { margin: 30px 0 10px; color: #e2eac6b8; font-size: 9px; font-weight: 900; letter-spacing: .16em; }
+.poker-betting-line span + span::before { content: "•"; padding-right: 12px; color: #e9c586; }
+.pot-display { position: relative; margin: 58px auto 20px; width: fit-content; padding: 10px 30px; border: 1px solid #e4cc8973; border-radius: 99px; background: #123e35c9; box-shadow: 0 9px 20px #001c1766, inset 0 1px #fff2; }
+.pot-display strong { margin-top: 2px; font-size: 21px; }
+.pot-chip-stack { position: absolute; left: -17px; top: 8px; width: 31px; height: 31px; border: 5px dashed #f9dcab; border-radius: 50%; background: radial-gradient(circle, #a74f42 0 47%, #edca98 50% 56%, #963d39 59%); box-shadow: 2px 3px 0 #6d2e2c, 4px 6px 0 #cb7964, 6px 9px 8px #001d19; }
+.card-row { align-items: center; }
+.card-slot { width: 48px; height: 67px; border: 2px dashed #e9f6d45c; border-radius: 7px; background: #001d1526; }
+.playing-card { position: relative; transform-origin: 80% -130%; animation: deal-in .58s cubic-bezier(.16,.8,.24,1.08) both; animation-delay: calc(var(--deal-index, 0) * 95ms); box-shadow: 0 8px 13px #001a14a8, 0 1px 0 #ffffffb0 inset; }
+.playing-card::after { content: ""; position: absolute; inset: 2px; border: 1px solid #43685125; border-radius: 4px; pointer-events: none; }
+.hand-line { min-width: 135px; padding: 13px 15px; border-radius: 18px; background: linear-gradient(180deg, #07382ebd, #052b2ec7); box-shadow: 0 9px 18px #001f1a54, inset 0 1px #ffffff1d; }
+.hand-line small { display: flex; align-items: center; gap: 5px; }
+.mini-chip { width: 15px; height: 15px; border: 3px dashed #f7e0aa; border-radius: 50%; background: #b9584e; box-shadow: 0 2px #72372f; }
+@keyframes deal-in { from { opacity: 0; transform: translate3d(90px, -95px, 0) rotate(-20deg) scale(.8); filter: blur(3px); } 65% { opacity: 1; filter: blur(0); } 82% { transform: translate3d(-3px, 2px, 0) rotate(2deg) scale(1.02); } to { opacity: 1; transform: translate3d(0, 0, 0) rotate(0) scale(1); } }
+
+/* The player lives in the root provider so route changes do not replace its audio element. */
+.audio-dock { position: fixed; right: 18px; bottom: 18px; z-index: 15; display: flex; align-items: center; gap: 9px; width: min(430px, calc(100vw - 36px)); min-height: 62px; padding: 7px 9px; border: 1px solid #d8ecc07a; border-radius: 15px; background: #102923f0; box-shadow: 0 15px 45px #0009, inset 0 1px #ffffff3b; backdrop-filter: blur(16px); }
+.audio-track-art { flex: 0 0 42px; height: 42px; display: grid; place-items: center; border: 1px solid #f0eed59c; border-radius: 9px; background: radial-gradient(circle at 30% 20%, #f2cf9a, #346b5c 65%, #173e39); background-size: cover; background-position: center; color: #f8f0d8; font: 900 15px Georgia, serif; }
+.audio-track-info { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.audio-track-info strong, .audio-track-info small { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.audio-track-info strong { font-size: 12px; }
+.audio-track-info small { color: #b2cabd; font-size: 10px; text-transform: capitalize; }
+.audio-player-actions { display: flex; align-items: center; gap: 1px; }
+.audio-player-actions button, .audio-settings-button, .audio-settings-heading button { width: 29px; height: 29px; border: 0; border-radius: 8px; background: transparent; color: #e9f0dd; font-size: 15px; }
+.audio-player-actions button:hover, .audio-settings-button:hover, .audio-settings-heading button:hover { background: #e8f4df20; }
+.audio-settings-button { border-left: 1px solid #e6e9d443; border-radius: 0; font-size: 19px; }
+.audio-settings { position: absolute; right: 0; bottom: calc(100% + 10px); width: min(330px, calc(100vw - 36px)); padding: 17px; border: 1px solid #d8ecc07a; border-radius: 15px; background: #102923f7; box-shadow: 0 15px 45px #0009; }
+.audio-settings-heading, .audio-settings label span { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.audio-settings-heading { margin-bottom: 14px; font-size: 14px; }
+.audio-settings label { display: grid; gap: 8px; margin: 14px 0; color: #e8f1df; font-size: 12px; }
+.audio-settings label button { padding: 3px 9px; border: 1px solid #d9e9c762; border-radius: 99px; background: #e8f4df14; color: #f2e4b8; font-size: 11px; }
+.audio-settings input[type="range"] { width: 100%; accent-color: #e7ce9c; }
+.audio-settings p { margin: 12px 0 0; color: #adc3b5; font-size: 11px; line-height: 1.4; }
+@media (max-width: 760px) { .table-deck { top: 54px; right: 7%; transform: scale(.8); } .table-card-zone { padding: 8px 12px; } .board-display { margin-top: 75px; } .table-felt-footer { margin: 20px 15px 0; } .table-bet-spots { gap: 5px; } .table-bet-spots span { min-width: 80px; font-size: 8px; } }
+@media (max-width: 500px) { .audio-dock { right: 10px; bottom: 10px; width: calc(100vw - 20px); } .table-deck { display: none; } .felt-table::before { inset: 12px; } .card-slot { width: 38px; height: 55px; } .board-display { gap: 8px; } .board-display .table-card-zone { min-width: 0; } .baccarat-betting-rail span { min-width: 75px; } .table-bet-spots span { min-width: 70px; } }
+@media (prefers-reduced-motion: reduce) { .playing-card { animation: none; } }
