@@ -10,7 +10,7 @@ Use Next.js App Router and TypeScript. Routes belong in `src/app/`, UI in `src/c
 
 ## Development Commands
 
-Run `npm install`, `npm run dev`, `npm run lint`, `npm run typecheck`, and `npm run build`. Local development uses SQLite automatically without Turso credentials.
+Run `npm install`, `npm run dev`, `npm run lint`, `npm run typecheck`, `npm test`, and `npm run build`. Tests use Node's test runner through `tsx`. With the production server on port 3002, `npm run test:smoke` checks route and audio-element rendering. Local development uses SQLite automatically without Turso credentials.
 
 ## Vercel Deployment & Persistence
 
@@ -19,6 +19,10 @@ Production uses Turso through `@libsql/client`. Configure `FLOPSTORAGE_TURSO_DAT
 ## Coding Style & Testing
 
 Use two-space indentation, functional React components, `camelCase` variables/functions, `PascalCase` components/types, and lowercase routes. Follow ESLint. Test poker ranking, betting, house rules, daily resets, XP, and permissions; name tests `*.test.ts` or `*.test.tsx`.
+
+## Design System
+
+Follow `docs/DESIGN_SYSTEM.md`: clear acrylic Aero Garden, with day and moonlit appearances sharing semantic tokens. Reuse the wordmark, object carousel, icons, dialogs, cards, and chips. Desktop game tables and primary decisions must fit together above the fold; move secondary chat below. Support mobile, keyboard focus, and reduced motion. Preserve game rules and music playback architecture, tracks, and preferences; music interface extensions must reuse the single AppProvider.
 
 ## Economy, Audio & Safety
 

@@ -2,27 +2,33 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
-import { SiteHeader } from "@/components/SiteHeader";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { api, useApp } from "@/components/AppContext";
-import type { Card } from "@/lib/games/cards";
+import { openAccount } from "@/components/SiteHeader";
+import { GameTable } from "@/components/games/GameTable";
+import { HouseControls, PokerControls } from "@/components/games/GameControls";
+import { Icon } from "@/components/ui/Icon";
+import { EmptyState, LoadingState } from "@/components/ui/PageElements";
+import { gameNames } from "@/lib/game-catalog";
+import type { EffectName } from "@/lib/audio";
 import type { HouseState } from "@/lib/games/house-room";
 import type { PokerState } from "@/lib/games/poker-room";
 
 type Room = { id: string; code: string | null; game: string; mode: string; visibility: string; hostId: string; seated: boolean; version: number;
   state: HouseState | PokerState; messages: { id: string; body: string; createdAt: string; username: string }[] };
-const names: Record<string, string> = { blackjack: "Blackjack", baccarat: "Baccarat", ultimate: "Ultimate Hold'em", holdem: "Texas Hold'em", omaha: "Pot-Limit Omaha" };
-const rank = (value: number) => ({ 11: "J", 12: "Q", 13: "K", 14: "A" } as Record<number, string>)[value] || value;
-
-function Cards({ cards, hidden = 0 }: { cards: Card[]; hidden?: number }) {
-  return <span className="card-row">{cards.map((card, index) => <span className={`playing-card ${card.suit === "♥" || card.suit === "♦" ? "red-card" : ""}`} style={{ "--deal-index": index } as CSSProperties} key={`${card.suit}-${card.rank}-${index}`}>{rank(card.rank)}<small>{card.suit}</small></span>)}
-    {Array.from({ length: hidden }, (_, index) => <span className="playing-card card-back" style={{ "--deal-index": cards.length + index } as CSSProperties} key={`hidden-${index}`}>DG</span>)}
-    {!cards.length && !hidden && <span className="card-slot" aria-hidden="true" />}</span>;
-}
 
 function cardCount(state: HouseState | PokerState): number {
   if (state.kind === "poker") return state.board.length + state.players.reduce((sum, player) => sum + player.hole.length, 0);
   return state.dealer.length + state.board.length + Object.values(state.hands).reduce((sum, hand) => sum + hand.length, 0);
+}
+
+function resultTone(room: Room, username: string): "win" | "lose" | "neutral" {
+  if (room.state.kind === "house") {
+    const entry = room.state.result.split(" · ").find((item) => item.startsWith(`${username}: `));
+    const net = entry ? Number(entry.slice(username.length + 2)) : 0;
+    return net > 0 ? "win" : net < 0 ? "lose" : "neutral";
+  }
+  return room.state.message.split(" · ").some((entry) => entry.startsWith(`${username} won `) || entry.startsWith(`${username} wins `)) ? "win" : "lose";
 }
 
 export default function RoomPage() {
@@ -36,22 +42,31 @@ export default function RoomPage() {
   const [side, setSide] = useState("player");
   const [raise, setRaise] = useState(40);
   const [message, setMessage] = useState("");
+  const [copied, setCopied] = useState(false);
   const tickBusy = useRef(false);
-  const lastCards = useRef<number | null>(null);
+  const previousRoom = useRef<Room | null>(null);
+  const soundRef = useRef(sound);
   const userId = user?.id;
-
+  const username = user?.username || "";
   const game = room?.game;
   useEffect(() => { if (game) setAudioZone(game); }, [game, setAudioZone]);
+  useEffect(() => { soundRef.current = sound; }, [sound]);
 
   useEffect(() => {
     if (!room) return;
-    const count = cardCount(room.state);
-    const previous = lastCards.current;
-    lastCards.current = count;
-    if (previous === null || count <= previous) return;
-    const timers = Array.from({ length: Math.min(count - previous, 6) }, (_, index) => setTimeout(() => sound("card"), 80 + index * 105));
+    const before = previousRoom.current;
+    previousRoom.current = room;
+    if (!before || before.id !== room.id || before.version === room.version) return;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const round = room.state.kind === "house" ? room.state.round : room.state.hand;
+    const oldRound = before.state.kind === "house" ? before.state.round : before.state.hand;
+    const count = Math.max(0, cardCount(room.state) - (round === oldRound ? cardCount(before.state) : 0));
+    for (let index = 0; index < Math.min(count, 3); index++) timers.push(setTimeout(() => soundRef.current("card"), 80 + index * 130));
+    if (before.state.phase !== room.state.phase && ["finished", "complete"].includes(room.state.phase) && room.seated) {
+      timers.push(setTimeout(() => soundRef.current(resultTone(room, username)), count ? 600 : 60));
+    } else if (room.state.turn === userId && before.state.turn !== userId) timers.push(setTimeout(() => soundRef.current("notify"), 180));
     return () => timers.forEach(clearTimeout);
-  }, [room, sound]);
+  }, [room, userId, username]);
 
   useEffect(() => {
     if (!userId) return;
@@ -76,113 +91,47 @@ export default function RoomPage() {
     try {
       const result = await api<Room>(`/api/rooms/${id}`, { action: name, ...extra });
       setRoom(result);
-      if (["bet", "raise", "call", "double", "rebuy"].includes(name)) sound("chip");
-      if (room?.state.phase !== result.state.phase && ["finished", "complete"].includes(result.state.phase) && result.seated && user) {
-        const winning = result.state.kind === "house"
-          ? Number(result.state.result.split(" · ").find((entry) => entry.startsWith(`${user.username}: `))?.split(": ")[1] || 0) > 0
-          : result.state.message.split(" · ").some((entry) => entry.startsWith(`${user.username} won `) || entry.startsWith(`${user.username} wins `));
-        sound(winning ? "win" : "lose");
-      }
+      const cue: EffectName = ["bet", "raise", "call", "double", "rebuy"].includes(name) ? "chip" : "select";
+      if (!["start", "hit"].includes(name)) sound(cue);
       await refresh();
       if (name === "leave") router.push("/");
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "Action failed."); }
+    } catch (cause) { sound("error"); setError(cause instanceof Error ? cause.message : "Action failed."); }
     finally { setBusy(false); }
   }
 
   async function chat(event: FormEvent) {
     event.preventDefault();
     if (!message.trim()) return;
-    const body = message;
-    setMessage("");
-    await action("chat", { body });
+    setBusy(true);
+    try { setRoom(await api<Room>(`/api/rooms/${id}`, { action: "chat", body: message })); setMessage(""); sound("confirm"); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : "Could not send your message."); }
+    finally { setBusy(false); }
   }
 
-  return <main className="shell">
-    <SiteHeader />
-    <div className="table-breadcrumb"><Link href="/">← Lobby</Link><span>/</span><span>{room ? names[room.game] : "Loading table"}</span></div>
-    {!ready || (user && !room && !error) ? <div className="panel table-loading">Preparing your table…</div> : !user ? <div className="panel table-loading">Sign in or continue as a guest from the top right to play.</div> : !room ? <div className="panel table-loading"><p className="form-error">{error}</p><Link href="/">Back to lobby</Link></div> : <>
-      <div className="table-heading"><div><p className="eyebrow">{room.mode === "house" ? "HOUSE TABLE" : room.mode === "cash" ? "CHIP TABLE" : "SIT-AND-GO TOURNAMENT"}</p><h1>{names[room.game]}</h1></div>
-        <div className="table-code">{room.visibility === "private" ? <>INVITE CODE <strong>{room.code}</strong><button onClick={() => { if (room.code) void navigator.clipboard.writeText(room.code); }}>Copy</button></> : <span>{room.visibility.toUpperCase()} TABLE</span>}</div></div>
-      <div className="table-layout">
-        <section className="table-main">
-          <div className="felt-table">
-            <div className="table-topline"><span>DG FLOPS · {room.state.kind === "house" ? `ROUND ${room.state.round}` : `HAND ${room.state.hand}`}</span><span>{room.state.phase.toUpperCase()}</span></div>
-            <div className="table-deck" aria-hidden="true"><span>DG</span><span>DG</span></div>
-            {room.state.kind === "house" ? <HouseDisplay state={room.state} userId={user.id} /> : <PokerDisplay state={room.state} userId={user.id} />}
-            <div className="table-felt-footer"><span>PLAY FOR THE MOMENT</span><span>FUN CHIPS ONLY</span></div>
-          </div>
-          <div className="table-status" role="status">{room.state.kind === "house" ? room.state.result : room.state.message}</div>
-          {error && <p className="form-error" role="alert">{error}</p>}
-          {!room.seated ? <button className="primary-button" disabled={busy || user.guest} onClick={() => void action("join")}>Join table {room.state.kind === "poker" ? "· 1,000 chips" : ""}</button>
-            : room.state.kind === "house" ? <HouseControls state={room.state} userId={user.id} busy={busy} bet={bet} setBet={setBet} side={side} setSide={setSide} action={action} />
-              : <PokerControls state={room.state} userId={user.id} busy={busy} raise={raise} setRaise={setRaise} action={action} />}
-        </section>
-        <aside className="table-sidebar">
-          <div className="panel seats-panel"><p className="eyebrow">AT THE TABLE</p><h2>Players</h2>
-            {(room.state.kind === "house" ? room.state.seats : room.state.players).map((player) => <div className="seat-line" key={player.id}><span className="seat-avatar">{player.name.slice(0, 1).toUpperCase()}</span><span>{player.name}{player.id === user.id ? " (you)" : ""}</span>{"stack" in player && typeof player.stack === "number" && <strong>{player.stack.toLocaleString()}</strong>}</div>)}
-          </div>
-          <div className="panel chat-panel"><p className="eyebrow">TABLE TALK</p><h2>Chat</h2>
-            <div className="chat-messages" aria-live="polite">{room.messages.length ? room.messages.map((item) => <p key={item.id}><strong>{item.username}</strong> {item.body}</p>) : <p className="empty-copy">No messages yet. Say hello.</p>}</div>
-            {room.seated && !user.guest ? <form className="chat-form" onSubmit={chat}><input aria-label="Chat message" maxLength={300} placeholder="Say something…" value={message} onChange={(event) => setMessage(event.target.value)} /><button disabled={busy}>Send</button></form> : <p className="fine-print">Accounts can chat at the table.</p>}
-          </div>
-          {room.seated && <button className="text-button leave-button" disabled={busy} onClick={() => void action("leave")}>Leave table</button>}
-        </aside>
-      </div>
-      <p className="fine-print table-disclaimer">Fun-play chips have no monetary value. Turns expire after 60 seconds; timed-out players check when possible, otherwise fold or stand.</p>
+  const finished = room && ["finished", "complete"].includes(room.state.phase);
+  const tone = room && finished && room.seated ? resultTone(room, username) : "neutral";
+  return <main id="main-content" className="room-page">
+    <nav className="table-breadcrumb" aria-label="Breadcrumb"><Link href="/" data-sound="navigate">← The lobby</Link><span>/</span><span>{room ? gameNames[room.game] : "Your table"}</span></nav>
+    {!ready || (user && !room && !error) ? <div className="panel"><LoadingState label="Preparing your table…" /></div> : !user ? <div className="panel"><EmptyState icon="user" title="There's a seat waiting for you."><p>Sign in or try a solo house game as a guest.</p><button className="primary-button" onClick={openAccount}>Come on in <Icon name="arrow" /></button></EmptyState></div> : !room ? <div className="panel"><EmptyState title="We couldn't open this table."><p className="form-error" role="alert">{error}</p><Link className="secondary-button" href="/">Back to the lobby</Link></EmptyState></div> : <>
+      <div className="table-heading"><div><p className="eyebrow">{room.mode === "house" ? "AT YOUR OWN PACE" : room.mode === "cash" ? "A LITTLE FRIENDLY COMPETITION" : "SIT-AND-GO TOURNAMENT"}</p><h1>{gameNames[room.game]}</h1></div><div className="table-code">{room.visibility === "private" ? <><Icon name="lock" /><span>Invite code <strong>{room.code}</strong></span><button className="secondary-button" onClick={async () => { try { if (room.code) { await navigator.clipboard.writeText(room.code); setCopied(true); sound("confirm"); } } catch { setError("Copy the invite code shown here to share it."); } }}>{copied ? "Copied" : "Copy"}</button></> : <span className="status-badge"><i className="status-light" /> {room.visibility === "solo" ? "Your solo table" : "Public table"}</span>}</div></div>
+      <div className="table-layout"><section className="table-main" aria-label={`${gameNames[room.game]} game`}>
+        <GameTable state={room.state} userId={user.id} />
+        <div className="decision-console">
+        <div className={`table-status ${finished ? `result-${tone}` : ""}`} role="status"><Icon name={finished ? tone === "win" ? "trophy" : tone === "lose" ? "wave" : "check" : "info"} /><span>{finished && <strong>{tone === "win" ? "A lovely hand. " : tone === "lose" ? "On to the next one. " : "Round complete. "}</strong>}{room.state.kind === "house" ? room.state.result : room.state.message}</span></div>
+        {error && <p className="form-error" role="alert">{error}</p>}
+        {!room.seated ? <button className="primary-button" disabled={busy || user.guest} onClick={() => void action("join")}>Take a seat {room.state.kind === "poker" ? "· 1,000 chips" : ""}<Icon name="arrow" /></button> : room.state.kind === "house" ? <HouseControls state={room.state} userId={user.id} busy={busy} bet={bet} setBet={setBet} side={side} setSide={setSide} action={action} /> : <PokerControls state={room.state} userId={user.id} busy={busy} raise={raise} setRaise={setRaise} action={action} />}
+        </div>
+      </section><aside className="table-sidebar">
+        <div className="panel seats-panel"><div className="panel-heading"><div><p className="eyebrow">GOOD COMPANY</p><h2>At the table</h2></div><Icon name="users" /></div>
+          {(room.state.kind === "house" ? room.state.seats : room.state.players).map((player) => <div className="seat-line" key={player.id}><span className="seat-avatar">{player.name[0].toUpperCase()}</span><span>{player.name}{player.id === user.id && <small> You</small>}</span>{"stack" in player && typeof player.stack === "number" && <strong>{player.stack.toLocaleString()}</strong>}</div>)}
+        </div>
+        <div className="panel chat-panel"><div className="panel-heading"><div><p className="eyebrow">A LITTLE TABLE TALK</p><h2>Say hello.</h2></div><Icon name="chat" /></div>
+          <div className="chat-messages" role="log" aria-label="Table chat" aria-live="polite" aria-relevant="additions">{room.messages.length ? room.messages.map((item) => <p key={item.id}><strong>{item.username}</strong><span>{item.body}</span></p>) : <p className="empty-copy">Good hands start with good company.</p>}</div>
+          {room.seated && !user.guest ? <form className="chat-form" onSubmit={chat}><input aria-label="Chat message" maxLength={300} placeholder="Say something nice…" value={message} onChange={(event) => setMessage(event.target.value)} /><button className="icon-button" disabled={busy || !message.trim()} aria-label="Send message"><Icon name="arrow" /></button></form> : <p className="fine-print">Sign in and take a seat to chat.</p>}
+        </div>
+        {room.seated && <button className="text-button leave-button" disabled={busy} onClick={() => void action("leave")}>Leave table <Icon name="arrow" /></button>}
+      </aside></div>
+      <p className="fine-print table-disclaimer">Fun-play chips have no monetary value. Turns last 60 seconds; timed-out players check when possible, otherwise fold or stand.</p>
     </>}
   </main>;
-}
-
-function HouseDisplay({ state, userId }: { state: HouseState; userId: string }) {
-  if (state.game === "baccarat") return <><div className="baccarat-betting-rail"><span>PLAYER</span><span>TIE</span><span>BANKER</span></div><div className="board-display"><div className="table-card-zone"><span>PLAYER HAND</span><Cards cards={state.hands.player || []} /></div><div className="table-card-zone"><span>BANKER HAND</span><Cards cards={state.hands.banker || []} /></div></div><div className="table-bet-spots"><span>PLAYER 1:1</span><span>TIE 8:1</span><span>BANKER 0.95:1</span></div></>;
-  return <><div className="dealer-display table-card-zone"><span>DEALER</span><Cards cards={state.dealer} hidden={state.game === "blackjack" && state.phase === "playing" ? 1 : 0} /></div>
-    {state.game === "ultimate" && <div className="community-cards table-card-zone"><span>COMMUNITY BOARD {state.stage?.toUpperCase()}</span><Cards cards={state.board} hidden={Math.max(0, 5 - state.board.length)} /></div>}
-    <div className="table-bet-spots"><span>{state.game === "blackjack" ? "BLACKJACK PAYS 3:2" : "ANTE"}</span><span>{state.game === "blackjack" ? "DEALER STANDS ON 17" : "BLIND"}</span><span>{state.game === "blackjack" ? "BETTING CIRCLE" : "PLAY"}</span></div>
-    <div className="player-hands">{state.seats.filter((seat) => state.bets[seat.id]).map((seat) => <div className={`hand-line ${state.turn === seat.id ? "active-hand" : ""}`} key={seat.id}><span>{seat.name}{seat.id === userId ? " · YOU" : ""}</span><Cards key={`${state.round}-${seat.id}`} cards={state.hands[seat.id] || []} hidden={state.game === "ultimate" && seat.id !== userId && state.phase !== "finished" ? 2 : 0} /><small><i className="mini-chip" /> {state.bets[seat.id].amount.toLocaleString()}</small></div>)}</div>
-  </>;
-}
-
-function PokerDisplay({ state, userId }: { state: PokerState; userId: string }) {
-  return <><div className="pot-display"><span className="pot-chip-stack" aria-hidden="true" />POT <strong>{state.pot.toLocaleString()} CHIPS</strong></div><div className="community-cards table-card-zone"><span>COMMUNITY CARDS</span><Cards cards={state.board} hidden={state.phase !== "waiting" && state.phase !== "finished" && state.phase !== "complete" ? 5 - state.board.length : 0} /></div><div className="poker-betting-line"><span>SMALL BLIND 10</span><span>BIG BLIND 20</span><span>{state.mode === "tournament" ? "TOURNAMENT" : "CHIP TABLE"}</span></div>
-    <div className="player-hands">{state.players.map((player) => <div className={`hand-line ${state.turn === player.id ? "active-hand" : ""} ${player.folded ? "folded-hand" : ""}`} key={player.id}>
-      <span>{player.name}{player.id === userId ? " · YOU" : ""}</span><Cards key={`${state.hand}-${player.id}`} cards={player.hole} hidden={player.hole.length === 0 && state.started && !["waiting", "complete"].includes(state.phase) && !player.folded ? state.game === "omaha" ? 4 : 2 : 0} />
-      <small>{player.lastAction || `◈ ${player.stack.toLocaleString()}`}</small></div>)}</div>
-  </>;
-}
-
-type HouseControlProps = { state: HouseState; userId: string; busy: boolean; bet: number; setBet: (value: number) => void; side: string; setSide: (value: string) => void;
-  action: (name: string, extra?: object) => Promise<void> };
-function HouseControls({ state, userId, busy, bet, setBet, side, setSide, action }: HouseControlProps) {
-  const myBet = state.bets[userId];
-  return <div className="action-panel">
-    {state.phase === "betting" && !myBet && <><label>Wager<input type="number" min="10" max="5000" step="10" value={bet} onChange={(event) => setBet(Number(event.target.value))} /></label>
-      {state.game === "baccarat" && <label>Bet on<select value={side} onChange={(event) => setSide(event.target.value)}><option value="player">Player</option><option value="banker">Banker</option><option value="tie">Tie</option></select></label>}
-      <button className="primary-button" disabled={busy} onClick={() => void action("bet", { amount: bet, side })}>Place bet {state.game === "ultimate" ? `· ${bet * 2} chips` : `· ${bet} chips`}</button></>}
-    {state.phase === "betting" && Object.keys(state.bets).length > 0 && <button className="secondary-button" disabled={busy} onClick={() => void action("start")}>Deal round</button>}
-    {state.phase === "playing" && state.turn === userId && <><span className="turn-label">YOUR TURN {state.stage ? `· ${state.stage.toUpperCase()}` : ""}</span>
-      {state.game === "blackjack" ? <><button className="primary-button" disabled={busy} onClick={() => void action("hit")}>Hit</button><button className="secondary-button" disabled={busy} onClick={() => void action("stand")}>Stand</button><button className="secondary-button" disabled={busy || state.hands[userId]?.length !== 2} onClick={() => void action("double")}>Double</button></>
-        : <>{state.stage !== "river" && <button className="secondary-button" disabled={busy} onClick={() => void action("check")}>Check</button>}
-          <button className="primary-button" disabled={busy} onClick={() => void action("raise")}>Play {state.stage === "preflop" ? "4×" : state.stage === "flop" ? "2×" : "1×"}</button>
-          {state.stage === "river" && <button className="secondary-button" disabled={busy} onClick={() => void action("fold")}>Fold</button>}</>}
-    </>}
-    {state.phase === "finished" && <button className="primary-button" disabled={busy} onClick={() => void action("next")}>Next round</button>}
-    {state.phase === "playing" && state.turn !== userId && <span className="waiting-note">Waiting for {state.seats.find((seat) => seat.id === state.turn)?.name || "the table"}…</span>}
-  </div>;
-}
-
-type PokerControlProps = { state: PokerState; userId: string; busy: boolean; raise: number; setRaise: (value: number) => void; action: (name: string, extra?: object) => Promise<void> };
-function PokerControls({ state, userId, busy, raise, setRaise, action }: PokerControlProps) {
-  const player = state.players.find((seat) => seat.id === userId);
-  const need = player ? state.currentBet - player.bet : 0;
-  return <div className="action-panel">
-    {(state.phase === "waiting" || state.phase === "finished") && <button className="primary-button" disabled={busy || state.players.filter((seat) => seat.stack > 0).length < 2} onClick={() => void action("start")}>Deal {state.mode === "tournament" ? "tournament" : "next hand"}</button>}
-    {player?.stack === 0 && state.mode === "cash" && ["waiting", "finished"].includes(state.phase) && <button className="secondary-button" disabled={busy} onClick={() => void action("rebuy")}>Rebuy · 1,000 chips</button>}
-    {state.turn === userId && <><span className="turn-label">YOUR TURN · {need > 0 ? `${need} TO CALL` : "CHECK OR BET"}</span>
-      <button className="secondary-button" disabled={busy} onClick={() => void action(need > 0 ? "call" : "check")}>{need > 0 ? `Call ${Math.min(need, player?.stack || 0)}` : "Check"}</button>
-      <label>Raise total<input type="number" min={state.currentBet + state.minRaise} max={(player?.stack || 0) + (player?.bet || 0)} value={raise} onChange={(event) => setRaise(Number(event.target.value))} /></label>
-      <button className="primary-button" disabled={busy} onClick={() => void action("raise", { amount: raise })}>Raise</button>
-      <button className="secondary-button" disabled={busy} onClick={() => void action("fold")}>Fold</button></>}
-    {state.turn && state.turn !== userId && <span className="waiting-note">Waiting for {state.players.find((seat) => seat.id === state.turn)?.name}…</span>}
-    {state.phase === "complete" && <span className="waiting-note">Tournament complete. Return to the lobby for another table.</span>}
-  </div>;
 }

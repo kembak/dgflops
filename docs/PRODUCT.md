@@ -18,10 +18,10 @@ DG Flops is an entertainment-only casino with fake chips, live games with friend
 
 ## Experience
 
-- Design for desktop first while remaining usable on phones. The homepage should center visual picture tiles and use a modern fusion of Frutiger Aero gloss and dark vaporwave focus: smooth 3D surfaces, motion, vivid gradients, and warm or aquatic colors. Avoid purple-blue gradients and the conventional gray-and-green casino look.
+- Use the Aero Garden direction in `DESIGN_SYSTEM.md`: clear acrylic objects, name-first outlined lettering, natural imagery, and humanist typography. Day-garden and moonlit-lagoon appearances share one system. A keyboard/touch-friendly object carousel replaces conventional game cards. Keep all primary desktop decisions visible beside the active table; mobile uses a dedicated flowing layout.
 - Audio is part of the game feel: distinct, soft, natural sounds for dealing cards, moving chips, winning, and losing, plus separate lobby and table music. Give music and effects separate controls, and respect reduced motion and user audio preferences.
 - Vaporwave and electronic house artists named during planning are references for mood. Use original or licensed tracks and sound effects that permit web use.
 
 ## Delivery boundaries
 
-The first playable release aims to include all five games and the listed account, social, progression, and audio features. The current starter is a foundation, not that release. Before implementation, define exact house rules, betting limits, room capacity, reconnection behavior, and achievement rewards for each game.
+All five games have implementations, together with account, social, progression, and audio interfaces. The redesign preserves those rules and services; it does not certify every game edge case. Music tracks and playback architecture are unchanged. A non-sticky top strip and hideable floating receiver share the existing playback state and callbacks.

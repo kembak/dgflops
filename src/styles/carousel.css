@@ -1,0 +1,28 @@
+.game-carousel { --orbit-step: clamp(120px, 22vw, 275px); position: relative; }
+.carousel-stage { position: relative; height: 350px; perspective: 1100px; touch-action: pan-y; overflow: hidden; overflow: clip; }
+.carousel-waterline { position: absolute; inset: 59% 6% 5%; border-radius: 50%; border: 1px solid var(--rim); background: radial-gradient(ellipse, #68cfe52a, transparent 70%); box-shadow: 0 1px 0 var(--line), inset 0 2px 0 var(--rim); transform: rotateX(60deg); }
+.carousel-object { position: absolute; left: calc(50% - 135px); top: 12px; width: 270px; padding: 0 0 14px; border: 0; background: transparent; color: var(--ink-strong); transform: translateX(calc(var(--position) * var(--orbit-step))) translateZ(calc(var(--distance) * -140px)) rotateY(calc(var(--position) * -17deg)) translateY(calc(var(--distance) * 14px)); z-index: calc(5 - var(--distance)); opacity: calc(1 - var(--distance) * .17); transition: transform 450ms var(--ease-out), opacity 300ms; }
+.object-capsule { display: block; position: relative; height: 245px; border: 2px solid var(--rim); border-radius: 46% 46% 35% 35% / 40% 40% 29% 29%; background: var(--acrylic); box-shadow: var(--acrylic-shadow); }
+.object-capsule::before { content: ""; position: absolute; inset: 7px; border: 1px solid var(--rim); border-radius: inherit; background: linear-gradient(125deg, transparent 27%, #ffffff60 28%, transparent 30%, transparent 56%, #ffffff2b 58%, transparent 65%); pointer-events: none; }
+.object-capsule::after { content: ""; position: absolute; top: 6%; left: 15%; right: 20%; height: 12%; border-top: 3px solid #ffffffc0; border-radius: 50%; transform: rotate(-10deg); }
+.object-capsule .game-art { top: 18px; transform: scale(1.04); }
+.object-etching { position: absolute; bottom: 16px; left: 10px; right: 10px; font-size: 8px; letter-spacing: .15em; color: var(--ink); }
+.object-name { display: inline-block; margin-top: 20px; padding: 5px 13px; font-size: 16px; font-weight: 650; text-shadow: 0 1px var(--rim); }
+.carousel-object.is-selected .object-capsule { border-color: var(--accent); box-shadow: var(--acrylic-shadow), 0 12px 38px -8px color-mix(in srgb, var(--accent-light), transparent 25%), inset 0 -15px 20px -15px var(--accent); }
+.carousel-object:hover .object-capsule, .carousel-object:focus-visible .object-capsule { border-color: var(--accent); background: linear-gradient(145deg, #ffffff55, transparent 60%), var(--acrylic); }
+.carousel-object:focus-visible { outline-offset: 7px; border-radius: 45%; }
+.carousel-object:not(.is-selected) .object-name { font-size: 14px; }
+.carousel-console { display: grid; grid-template-columns: 48px minmax(0, 1fr) 48px auto; align-items: center; gap: 20px; width: min(830px, 100%); margin: 4px auto 20px; padding: 16px 22px; border: 1px solid var(--rim); border-radius: 28px 12px; background: var(--glass); box-shadow: var(--acrylic-shadow); }
+.carousel-caption { text-align: center; }
+.carousel-caption h3 { margin: 3px 0; font-size: 24px; }
+.carousel-caption .eyebrow { font-size: 8px; margin: 0; }
+.carousel-caption p { margin: 0; font-size: 12px; color: var(--muted); }
+.carousel-step { padding: 0; font-size: 23px; }
+.carousel-launch { max-width: 240px; }
+.carousel-selectors { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; }
+.carousel-selectors button { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; padding: 8px 13px; border: 1px solid transparent; border-radius: 12px 5px; color: var(--muted); background: transparent; font-size: 12px; }
+.carousel-selectors button[aria-pressed="true"] { background: var(--pearl); border-color: var(--accent); color: var(--ink-strong); box-shadow: var(--shadow-sm); }
+.carousel-selectors i { width: 8px; height: 8px; border: 1px solid var(--rim); border-radius: 50%; background: var(--accent); }
+.carousel-hint { text-align: center; color: var(--muted); font-size: 11px; margin: 14px 0 0; }
+@media (max-width: 650px) { .game-carousel { --orbit-step: 210px; } .carousel-stage { height: 325px; margin: 0 -12px; } .carousel-object { width: 230px; left: calc(50% - 115px); } .object-capsule { height: 230px; } .object-capsule .game-art { transform: scale(.91); } .carousel-console { grid-template-columns: 44px minmax(0, 1fr) 44px; gap: 10px; padding: 15px 12px; } .carousel-caption h3 { font-size: 20px; } .carousel-launch { grid-column: 1 / -1; justify-self: center; max-width: none; width: 100%; } .carousel-selectors { gap: 2px; } .carousel-selectors button { font-size: 11px; padding: 8px; } }
+@media (prefers-reduced-motion: reduce) { .carousel-object { transition: none; } }

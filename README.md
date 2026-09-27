@@ -16,6 +16,7 @@ Open `http://localhost:3000`. Before submitting changes, run:
 ```bash
 npm run lint
 npm run typecheck
+npm test
 npm run build
 ```
 
@@ -31,6 +32,14 @@ FLOPSTORAGE_TURSO_AUTH_TOKEN
 The connected Turso database is initialized automatically on the first server request. Never prefix these variables with `NEXT_PUBLIC_` or commit their values. To test Turso locally, pull the Vercel development environment with `vercel env pull .env.local` (Vercel CLI login required), then run `npm run dev`. Without that file, local SQLite remains usable. Vercel deployments must not use filesystem persistence. Redeploy after changing environment variables.
 
 Contributor conventions are in [AGENTS.md](AGENTS.md).
+
+## Interface architecture
+
+The Aero Garden design is specified in [the design system](docs/DESIGN_SYSTEM.md). Clear molded acrylic, original outlined lettering, and a manually operated 3D game-object carousel share day-garden and moonlit-lagoon tokens. The appearance selector follows the system by default and remembers explicit choices. Desktop tables put decisions beside the playing surface; mobile uses natural vertical flow. Game engines, API contracts, persistence, and music playback remain unchanged.
+
+The top music strip scrolls with the page. The floating receiver can be hidden/restored without stopping playback; both presentations control the same audio element. Its visibility preference is separate from audio preferences. With no saved visibility preference, tables start with the receiver collapsed to keep the play area clear.
+
+`npm test` runs presentation regression tests (not a complete game-engine suite). Run `npm run start -- -p 3002` and then `npm run test:smoke` for read-only HTTP checks; set `SMOKE_BASE_URL` for a different port. Browser acceptance checks and outstanding verification are listed in [UI verification](docs/UI_VERIFICATION.md).
 
 ## Music and sound
 

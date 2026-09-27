@@ -1,18 +1,33 @@
 "use client";
 
 import Link from "next/link";
-import { SiteHeader } from "@/components/SiteHeader";
 import { useApp } from "@/components/AppContext";
+import { openAccount } from "@/components/SiteHeader";
+import { Icon, type IconName } from "@/components/ui/Icon";
+import { EmptyState, LoadingState, PageIntro } from "@/components/ui/PageElements";
+
+const awardIcons: Record<string, IconName> = { first_hand: "cards", first_win: "trophy", regular: "leaf", high_roller: "chip", table_talk: "chat" };
 
 export default function ProfilePage() {
   const { user, progress, ready } = useApp();
-  return <main className="shell"><SiteHeader /><section className="inner-hero"><p className="eyebrow">YOUR JOURNEY</p><h1>Every hand <em>counts.</em></h1><p>Keep the memories and the rank XP, even when your chips reset tomorrow.</p></section>
-    {!ready ? <div className="panel">Loading your profile…</div> : !user || user.guest ? <div className="panel"><h2>Make it yours</h2><p>Create an account to earn achievements, chat, and appear on the leaderboard.</p><Link className="primary-button link-button" href="/">Explore the games</Link></div> : <>
-      <div className="stat-grid"><div className="panel stat-card"><span>CHIPS TODAY</span><strong>◈ {user.chips.toLocaleString()}</strong></div><div className="panel stat-card"><span>RANK XP</span><strong>{progress?.xp.toLocaleString() || "0"}</strong></div><div className="panel stat-card"><span>GAMES FINISHED</span><strong>{user.gamesPlayed}</strong></div><div className="panel stat-card"><span>WINS</span><strong>{user.wins}</strong></div></div>
-      <section className="profile-section"><div className="section-heading"><div><p className="eyebrow">COLLECT THE MOMENTS</p><h2>Achievements</h2></div></div>
-        <div className="achievement-grid">{progress?.catalog.map((item) => { const earned = progress.earned.some((entry) => entry.id === item.id); return <article className={`panel achievement-card ${earned ? "earned" : ""}`} key={item.id}><span className="achievement-icon">{earned ? "✦" : "◇"}</span><h3>{item.title}</h3><p>{item.description}</p><small>+{item.xp} XP · ◈ {item.chips}</small><b>{earned ? "EARNED" : "LOCKED"}</b></article>; })}</div>
+  return <main id="main-content" className="profile-page">
+    <PageIntro eyebrow="LITTLE MOMENTS. LASTING MEMORIES." title="Your collection." description="Every hand has a story. Keep the achievements, collect the memories, and watch your journey grow." icon="leaf" />
+    {!ready ? <div className="panel"><LoadingState label="Opening your collection…" /></div> : !user || user.guest ? <div className="panel"><EmptyState icon="user" title="A little space that's all yours."><p>Create an account to collect achievements, save your progress, and join your friends.</p><button className="primary-button" onClick={openAccount}>Your account <Icon name="arrow" /></button><Link className="text-button" href="/">Explore the games</Link></EmptyState></div> : <>
+      <div className="profile-welcome"><span className="profile-avatar">{user.username[0].toUpperCase()}</span><div><p className="eyebrow">CLUB MEMBER</p><h2>{user.username}</h2></div><span className="status-badge"><Icon name="leaf" /> {progress?.earned.length || 0} / {progress?.catalog.length || 5} collected</span></div>
+      <div className="stat-grid">{[
+        { label: "Chips today", value: user.chips.toLocaleString(), icon: "chip" as const, accent: "amber" },
+        { label: "Rank XP", value: progress?.xp.toLocaleString() || "0", icon: "trophy" as const, accent: "sky" },
+        { label: "Hands played", value: user.gamesPlayed, icon: "cards" as const, accent: "aqua" },
+        { label: "Wins", value: user.wins, icon: "leaf" as const, accent: "lime" },
+      ].map((stat) => <div className="panel stat-card" key={stat.label} data-accent={stat.accent}><span className="object-icon"><Icon name={stat.icon} /></span><span>{stat.label}</span><strong>{stat.value}</strong></div>)}</div>
+      <section className="profile-section"><div className="section-heading"><div><p className="eyebrow">SOMETHING TO REMEMBER</p><h2>Small wins. Big smiles.</h2></div><span className="muted">Achievements stay after your daily reset</span></div>
+        <div className="achievement-grid">{progress?.catalog.map((item) => {
+          const earned = progress.earned.some((entry) => entry.id === item.id);
+          return <article className={`panel achievement-card ${earned ? "earned" : ""}`} key={item.id}><span className="achievement-medallion"><Icon name={awardIcons[item.id] || "trophy"} /></span><span className={`achievement-state ${earned ? "positive" : ""}`}><Icon name={earned ? "check" : "lock"} />{earned ? "Collected" : "To discover"}</span><h3>{item.title}</h3><p>{item.description}</p><div className="achievement-reward"><span>+{item.xp} XP</span><span><Icon name="chip" /> {item.chips}</span></div></article>;
+        })}</div>
       </section>
-      <section className="profile-section panel"><p className="eyebrow">YOUR STORY</p><h2>Recent activity</h2>{progress?.history.length ? progress.history.map((item, index) => <div className="activity-row" key={`${item.created_at}-${index}`}><span>{item.note}</span><span>{item.xp >= 0 ? "+" : ""}{item.xp} XP</span></div>) : <p className="empty-copy">Your first game will start the story.</p>}</section>
-      <p className="fine-print">At 00:00 UTC, every account wallet resets to 10,000 chips. Achievements and game results remain.</p>
-    </>}</main>;
+      <section className="profile-section panel"><div className="panel-heading"><div><p className="eyebrow">YOUR RECENT MOMENTS</p><h2>The story so far.</h2></div><Icon name="wave" /></div>{progress?.history.length ? <ul className="activity-list">{progress.history.map((item, index) => <li className="activity-row" key={`${item.created_at}-${index}`}><span className="activity-icon"><Icon name={item.kind === "achievement" ? "trophy" : "cards"} /></span><span><strong>{item.note}</strong><time dateTime={item.created_at}>{new Date(item.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" })}</time></span><b className={item.xp >= 0 ? "positive" : "negative"}>{item.xp >= 0 ? "+" : ""}{item.xp.toLocaleString()} XP</b></li>)}</ul> : <EmptyState title="Your first hand is a good place to start."><p>Play a game and your recent moments will appear here.</p><Link className="secondary-button" href="/">Find a game <Icon name="arrow" /></Link></EmptyState>}</section>
+      <p className="info-note"><Icon name="info" /> Every account gets 10,000 chips at 00:00 UTC. Your achievements and game results stay.</p>
+    </>}
+  </main>;
 }

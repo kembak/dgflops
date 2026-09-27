@@ -1,112 +1,109 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
-import { SiteHeader } from "@/components/SiteHeader";
 import { api, useApp } from "@/components/AppContext";
+import { openAccount } from "@/components/SiteHeader";
+import { Dialog } from "@/components/ui/Dialog";
+import { Icon } from "@/components/ui/Icon";
+import { EmptyState, LoadingState } from "@/components/ui/PageElements";
+import { GameArtwork } from "@/components/games/GameAssets";
+import { GameCarousel } from "@/components/games/GameCarousel";
+import { games, gameNames } from "@/lib/game-catalog";
 
 type RoomSummary = { id: string; game: string; mode: string; phase: string; players: number; maxPlayers: number };
-const games = [
-  { id: "ultimate", name: "Ultimate Hold'em", category: "TABLE GAME", symbol: "A♠", tone: "coral", description: "Face the dealer with your best five-card hand." },
-  { id: "blackjack", name: "Blackjack", category: "TABLE GAME", symbol: "21", tone: "gold", description: "Draw to 21 with friends at the same table." },
-  { id: "baccarat", name: "Baccarat", category: "TABLE GAME", symbol: "9", tone: "mint", description: "Back the player, banker, or a rare tie." },
-  { id: "holdem", name: "Texas Hold'em", category: "POKER", symbol: "♠", tone: "rose", description: "No-limit poker, shared pots, real opponents." },
-  { id: "omaha", name: "Pot-Limit Omaha", category: "POKER", symbol: "4", tone: "aqua", description: "Four hole cards and pot-limit action." },
-] as const;
-const names: Record<string, string> = Object.fromEntries(games.map((game) => [game.id, game.name]));
 
 export default function Home() {
   const router = useRouter();
-  const { user, ready, refresh, sound } = useApp();
+  const { user, ready, refresh, authenticate, sound } = useApp();
   const [rooms, setRooms] = useState<RoomSummary[]>([]);
+  const [roomsReady, setRoomsReady] = useState(false);
+  const [roomsError, setRoomsError] = useState("");
   const [selected, setSelected] = useState<(typeof games)[number] | null>(null);
   const [visibility, setVisibility] = useState("public");
   const [mode, setMode] = useState("cash");
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [query, setQuery] = useState("");
+  const [category, setCategory] = useState("all");
+  const filtered = games.filter((game) => (category === "all" || game.category === category) && `${game.name} ${game.detail}`.toLowerCase().includes(query.toLowerCase()));
 
   useEffect(() => {
     let alive = true;
-    async function load() { try { const result = await api<{ rooms: RoomSummary[] }>("/api/rooms"); if (alive) setRooms(result.rooms); } catch { /* The action error will be shown when a room is opened. */ } }
+    async function load() {
+      try { const result = await api<{ rooms: RoomSummary[] }>("/api/rooms"); if (alive) { setRooms(result.rooms); setRoomsError(""); } }
+      catch { if (alive) setRoomsError("The lobby couldn't connect. We'll try again shortly."); }
+      finally { if (alive) setRoomsReady(true); }
+    }
     void load();
     const timer = setInterval(load, 5000);
     return () => { alive = false; clearInterval(timer); };
   }, []);
 
   async function create() {
-    if (!selected) return;
-    if (!user) { setError("Sign in or continue as a guest first."); return; }
-    if (user.guest && (visibility !== "solo" || selected.category === "POKER")) { setError("Guests can only play solo house games."); return; }
+    if (!selected || !user) return;
+    if (user.guest && (visibility !== "solo" || selected.category === "POKER")) { setError("Guests can play solo house games. Sign in to join friends."); return; }
     setBusy(true); setError("");
     try {
       const result = await api<{ id: string }>("/api/rooms", { game: selected.id, mode, visibility });
-      sound("chip"); await refresh(); router.push(`/room/${result.id}`);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not create a room."); }
+      sound("confirm"); await refresh(); router.push(`/room/${result.id}`);
+    } catch (cause) { sound("error"); setError(cause instanceof Error ? cause.message : "Could not create a room."); }
     finally { setBusy(false); }
   }
 
   async function joinPrivate(event: FormEvent) {
     event.preventDefault();
-    if (!user || user.guest) { setError("Sign in to join a private table."); return; }
+    if (!user || user.guest) { openAccount(); return; }
     setBusy(true); setError("");
-    try { const result = await api<{ id: string }>("/api/rooms", { action: "joinCode", code: code.trim() }); router.push(`/room/${result.id}`); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : "Room not found."); }
+    try { const result = await api<{ id: string }>("/api/rooms", { action: "joinCode", code: code.trim() }); sound("confirm"); router.push(`/room/${result.id}`); }
+    catch (cause) { sound("error"); setError(cause instanceof Error ? cause.message : "Room not found."); }
     finally { setBusy(false); }
   }
 
-  return <main className="shell">
-    <SiteHeader />
+  return <main id="main-content" className="lobby-page">
     <section className="hero" aria-labelledby="hero-title">
-      <div className="hero-content">
-        <p className="eyebrow"><span className="status-light" />THE SOCIAL CASINO, REIMAGINED</p>
-        <h1 id="hero-title">Play for <em>the moment.</em></h1>
-        <p className="hero-copy">The thrill of the table. The company of friends. All the fun, none of the stakes.</p>
-        <div className="hero-tags"><span>FUN-PLAY CHIPS</span><span>LIVE TABLES</span><span>YOUR CREW</span></div>
-        <a className="hero-cta" href="#games">Find your table <span aria-hidden="true">↗</span></a>
+      <Image src="/images/aero-garden.webp" alt="" fill priority sizes="(max-width: 1440px) 100vw, 1440px" className="hero-landscape" />
+      <div className="hero-content"><p className="eyebrow"><span className="status-light" /> WELCOME TO YOUR LITTLE ESCAPE</p>
+        <h1 id="hero-title">Bare moro.<br /><span>Uten tap.</span></h1>
+        <p className="hero-copy">Felleskap, entusiasme, fun-play. På DG Flops spiller vi <i>for the love of the game</i>.</p>
+        <a className="primary-button hero-cta" href="#games" data-sound="navigate">Finn ditt spill <Icon name="arrow" /></a>
+        <div className="hero-tags"><span><Icon name="chip" /> 10,000 daily chips</span><span><Icon name="users" /> Better with friends</span></div>
       </div>
-      <div className="hero-object" aria-hidden="true"><div className="orb-face">DG</div></div>
+      <span className="hero-corner-note"><Icon name="leaf" /> Ekte spill. Ingen ekte penger.</span>
     </section>
 
+    <div className="welcome-strip"><span className="object-icon"><Icon name="wave" /></span><div><strong>{user ? `Nice to see you, ${user.username}.` : "Come on in. The water's lovely."}</strong><span>{user ? "Your next good hand is waiting." : "Pick a game, settle in, and make yourself at home."}</span></div><span className="status-badge"><i className="status-light" /> {rooms.length} open {rooms.length === 1 ? "table" : "tables"}</span></div>
+
     <section className="games" id="games" aria-labelledby="games-title">
-      <div className="section-heading"><div><p className="eyebrow">FIND YOUR TABLE</p><h2 id="games-title">The lineup</h2></div><p>Five games. Real friends. Your kind of night.</p></div>
-      <div className="game-grid">
-        {games.map((game, index) => <button className={`game-tile ${game.tone}`} key={game.id} onClick={() => { setSelected(game); setVisibility(user?.guest ? "solo" : "public"); setError(""); }}>
-          <span className="tile-top"><span>{String(index + 1).padStart(2, "0")} / {game.category}</span><span>✳</span></span>
-          <span className="tile-symbol" aria-hidden="true">{game.symbol}</span>
-          <span className="tile-bottom"><span><strong>{game.name}</strong><small>{game.description}</small></span><span className="tile-arrow">↗</span></span>
-        </button>)}
-      </div>
+      <div className="section-heading"><div><p className="eyebrow">NOE FOR ENHVER STEMNING</p><h2 id="games-title">Hvor skal vi spille i dag?</h2></div><label className="search-field"><Icon name="search" /><span className="sr-only">Search games</span><input value={query} onChange={(event) => setQuery(event.target.value)} type="search" placeholder="Find your game…" /></label></div>
+      <div className="game-toolbar"><div className="tabs" role="group" aria-label="Game category">{[["all", "All games"], ["TABLE GAME", "Table games"], ["POKER", "Poker with friends"]].map(([value, label]) => <button key={value} aria-pressed={category === value} className={category === value ? "active" : ""} onClick={() => setCategory(value)} data-sound="select">{label}</button>)}</div><span className="muted">{filtered.length} games to explore</span></div>
+      <GameCarousel items={filtered} onLaunch={(game) => { setSelected(game); setVisibility(user?.guest ? "solo" : "public"); setError(""); }} />
+      {!filtered.length && <div className="panel"><EmptyState icon="search" title="No games found"><p>Try a different name or explore all five games.</p><button className="secondary-button" onClick={() => { setQuery(""); setCategory("all"); }}>Show all games</button></EmptyState></div>}
     </section>
 
     <section className="lobby-lower">
-      <div className="panel"><div className="panel-heading"><div><p className="eyebrow">THE LOBBY</p><h2>Open tables</h2></div><span className="live-dot">● LIVE</span></div>
-        {rooms.length ? <div className="room-list">{rooms.map((room) => <Link href={`/room/${room.id}`} className="room-list-item" key={room.id}>
-          <span><strong>{names[room.game] || room.game}</strong><small>{room.mode === "house" ? "House table" : room.mode === "cash" ? "Chip table" : "Sit-and-go tournament"}</small></span>
-          <span>{room.players}/{room.maxPlayers} seated</span><span className="room-phase">{room.phase} ↗</span>
-        </Link>)}</div> : <p className="empty-copy">No public tables yet. Pick a game above to open the first one.</p>}
+      <div className="panel"><div className="panel-heading"><div><p className="eyebrow">THERE&apos;S A SEAT FOR YOU</p><h2>Meet at the table.</h2></div><span className="status-badge"><i className="status-light" /> Live</span></div>
+        {!roomsReady ? <LoadingState label="Finding open tables…" /> : roomsError ? <p className="form-error" role="alert">{roomsError}</p> : rooms.length ? <div className="room-list">{rooms.map((room) => <Link href={`/room/${room.id}`} className="room-list-item" key={room.id} data-sound="navigate"><span className="room-game-icon"><Icon name="cards" /></span><span><strong>{gameNames[room.game] || room.game}</strong><small>{room.mode === "house" ? "House table" : room.mode === "cash" ? "Chip table" : "Sit-and-go tournament"}</small></span><span className="seat-count"><Icon name="users" /> {room.players}/{room.maxPlayers}</span><Icon name="arrow" /></Link>)}</div> : <EmptyState icon="users" title="Be the first to pull up a chair."><p>Choose a game above and open a table for friends.</p></EmptyState>}
       </div>
-      <div className="panel invite-panel"><p className="eyebrow">YOUR PRIVATE TABLE</p><h2>Bring your crew.</h2><p>Share a room code with friends and meet at the table.</p>
-        <form onSubmit={joinPrivate} className="join-form"><input aria-label="Room code" placeholder="ENTER ROOM CODE" maxLength={8} value={code} onChange={(event) => setCode(event.target.value.toUpperCase())} /><button disabled={busy}>Join ↗</button></form>
-        <Link href="/leaderboard" className="subtle-link">See the leaderboard →</Link>
+      <div className="panel invite-panel"><span className="invite-object" aria-hidden="true"><Icon name="chat" /></span><p className="eyebrow">A LITTLE SPACE FOR YOUR PEOPLE</p><h2>Your table.<br />Your company.</h2><p>Have an invite? Bring your room code and we&apos;ll save you a seat.</p>
+        <form onSubmit={joinPrivate} className="join-form"><input aria-label="Room code" placeholder="ROOM CODE" maxLength={8} required value={code} onChange={(event) => setCode(event.target.value.toUpperCase())} /><button className="primary-button" disabled={busy}>Join <Icon name="arrow" /></button></form>
+        {error && !selected && <p className="form-error" role="alert">{error}</p>}
+        <Link href="/leaderboard" className="subtle-link" data-sound="navigate">See who&apos;s making waves <Icon name="arrow" /></Link>
       </div>
     </section>
-    {error && !selected && <p className="form-error" role="alert">{error}</p>}
-    <p className="closing"><span aria-hidden="true">✦</span> Good company. Great hands. Zero real-money stakes.</p>
-    <footer><span>DG FLOPS © {new Date().getFullYear()}</span><span>JUST FOR FUN</span></footer>
+    <section className="daily-banner"><span className="object-icon" data-accent="amber"><Icon name="chip" /></span><div><h3>Every day is a fresh start.</h3><p>10,000 chips at 00:00 UTC. Your achievements and XP stay with you.</p></div><Link href="/profile" className="secondary-button">My collection <Icon name="arrow" /></Link></section>
 
-    {selected && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelected(null); }}>
-      <section className="launch-modal" role="dialog" aria-modal="true" aria-labelledby="launch-title">
-        <button className="modal-close" onClick={() => setSelected(null)} aria-label="Close">×</button>
-        <p className="eyebrow">SET THE TABLE</p><h2 id="launch-title">{selected.name}</h2><p>{selected.description}</p>
+    {selected && <Dialog title={selected.name} eyebrow="MAKE YOURSELF COMFORTABLE" onClose={() => setSelected(null)}>
+      <div className="launch-art"><GameArtwork game={selected.id} /></div><p>{selected.detail}</p>
+      {!user ? <><p className="info-note">Sign in to save your progress and play with friends.</p><button className="primary-button full-width" onClick={() => { setSelected(null); openAccount(); }}>Sign in or create an account <Icon name="user" /></button>{selected.category === "TABLE GAME" && <button className="text-button" disabled={busy || !ready} onClick={async () => { setBusy(true); if (await authenticate("guest")) setVisibility("solo"); setBusy(false); }}>Try this game as a guest</button>}</> : <>
         {selected.category === "POKER" && <label className="select-label">Format<select value={mode} onChange={(event) => setMode(event.target.value)}><option value="cash">Chip table · 1,000 buy-in</option><option value="tournament">Single-table tournament · 1,000 buy-in</option></select></label>}
-        <label className="select-label">Room<select value={visibility} onChange={(event) => setVisibility(event.target.value)}><option value="public">Public table</option><option value="private">Private table · share a code</option>{selected.category === "TABLE GAME" && <option value="solo">Solo house table</option>}</select></label>
-        {error && <p className="form-error" role="alert">{error}</p>}
-        {!ready && <p>Checking your session…</p>}
-        <button className="primary-button" disabled={busy || !ready} onClick={create}>{busy ? "Opening…" : "Open table ↗"}</button>
-        <p className="fine-print">Chips are for entertainment only and have no cash value.</p>
-      </section>
-    </div>}
+        <label className="select-label">Room<select value={visibility} onChange={(event) => setVisibility(event.target.value)}><option value="public" disabled={user.guest}>Public table</option><option value="private" disabled={user.guest}>Private table · share a code</option>{selected.category === "TABLE GAME" && <option value="solo">Solo house table</option>}</select></label>
+        {error && <p className="form-error" role="alert">{error}</p>}<button className="primary-button full-width" disabled={busy || !ready || (user.guest && selected.category === "POKER")} onClick={create}>{busy ? "Opening your table…" : "Let's play"}<Icon name="arrow" /></button>
+        {user.guest && selected.category === "POKER" && <p className="info-note">Poker needs an account and real opponents. Sign out of guest play to create your account.</p>}
+      </>}<p className="fine-print">Fun-play chips only. No cash value.</p>
+    </Dialog>}
   </main>;
 }
