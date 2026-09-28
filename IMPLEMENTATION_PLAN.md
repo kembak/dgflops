@@ -4,6 +4,14 @@ This file tracks the work toward the first playable release described in `docs/P
 
 ## Aero Garden redesign — active
 
+### Carousel-only refinement — 2026-09-29
+
+- [x] Inspect the existing carousel/reference and record the scope before coding.
+- [ ] Implement miniature acrylic table sculptures and stable console tracks.
+- [ ] Add controlled wheel/trackpad and pointer drag alongside keyboard navigation.
+- [ ] Iterate in the live browser across desktop/laptop/tablet/mobile and multiple games.
+- [ ] Run regression checks and sync final documentation with observed results.
+
 ### Clear acrylic refinement
 
 - [x] Inspect the existing implementation and document refinements before coding.

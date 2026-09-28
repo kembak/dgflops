@@ -54,6 +54,14 @@ Verification targets: all five games at 1280×720, 1366×768, and 1440×900; six
 
 ## Implemented component boundaries
 
+### Carousel showcase refinement (2026-09-29, pre-implementation)
+
+Replace only the carousel's capsule artwork with original code-native miniature casino-table dioramas, inspired by the supplied floating-table reference. Use thick clear acrylic plinths, inset playing surfaces, upright translucent suit plaques, actual miniature cards/chips, and distinct game layouts. Keep surrounding objects fully colored and separated; emphasize the selected object with scale, elevation, and a bounded colored orbit/glow rather than fading its neighbors. No bitmap reproduction, new imagery dependency, or changes to playable tables.
+
+The stage will accept normalized wheel/trackpad gestures, pointer drag/touch swipe, and Arrow/Home/End navigation. Horizontal gestures retain vertical page scrolling; wheel input is scoped to the stage, ignores pinch-zoom, and advances at a deliberate threshold with momentum protection. Selection remains shared with filters, selectors, caption, and launch action. Reduced motion removes travel and drag displacement.
+
+The console will reserve fixed navigation columns and a fixed CTA column on desktop; narrow layouts put the CTA on its own full-width row. Caption height and name overflow must be stable across all five games. Verify in the live browser at desktop, laptop, tablet, and mobile sizes, including multiple selections, wheel axes, pointer/touch input, focus, reduced motion, and measured navigation-button rectangles.
+
 - `tokens.css` owns both appearances, reading surfaces, table materials, acrylic rims, and game accents. `identity.css` supplies shared hardware treatments and wordmark sizing; `carousel.css` and `workspace.css` own their respective layouts.
 - `GameCarousel` uses bounded CSS perspective transforms with no autoplay, animation library, drag loop, blur, or persistent `will-change`. Arrow/Home/End navigation moves focus to the newly selected object. Swipe distinguishes horizontal intent from vertical scrolling and suppresses the following synthetic click.
 - `ThemeControl` persists `dg-appearance`; a small pre-paint initializer prevents a bright initial page in night mode. System changes are subscribed to, and unavailable storage falls back to the current session.
