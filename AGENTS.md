@@ -10,11 +10,11 @@ Use Next.js App Router and TypeScript. Routes belong in `src/app/`, UI in `src/c
 
 ## Development Commands
 
-Run `npm install`, `npm run dev`, `npm run lint`, `npm run typecheck`, `npm test`, and `npm run build`. Tests use Node's test runner through `tsx`. With the production server on port 3002, `npm run test:smoke` checks route and audio-element rendering. Local development uses SQLite automatically without Turso credentials.
+Run `npm install`, `npm run dev`, `npm run lint`, `npm run typecheck`, `npm test`, and `npm run build`. Tests use Node's test runner through `tsx` and isolated temporary databases. `npm run test:smoke` targets port 3002 by default. Use `npm run db:status` to verify database identity safely.
 
 ## Vercel Deployment & Persistence
 
-Production uses Turso through `@libsql/client`. Configure `FLOPSTORAGE_TURSO_DATABASE_URL` and `FLOPSTORAGE_TURSO_AUTH_TOKEN` in every Vercel environment; never expose them through `NEXT_PUBLIC_`. Without them, local development uses `data/dgflops.sqlite`, importing an existing JSON store once if empty. The `app_state` snapshot is updated in write transactions. Never use local files, process memory, or long-lived WebSockets for production state. Test data-preserving schema changes locally before deployment.
+Production uses Turso through `@libsql/client`. Configure both `FLOPSTORAGE_TURSO_DATABASE_URL` and `FLOPSTORAGE_TURSO_AUTH_TOKEN`; never expose them through `NEXT_PUBLIC_`. Local SQLite requires explicit `DG_DATABASE_MODE=local` and must not coexist with Turso credentials. Missing/partial configuration fails closed. Preserve the transactional `app_state` snapshot and all records. Use additive, backup-preserving `npm run db:migrate`; never reset/drop data on startup or deployment. See `docs/DATABASE.md` and `docs/ARCHITECTURE.md`.
 
 ## Coding Style & Testing
 
@@ -22,7 +22,7 @@ Use two-space indentation, functional React components, `camelCase` variables/fu
 
 ## Design System
 
-Follow `docs/DESIGN_SYSTEM.md`: clear acrylic Aero Garden, with day and moonlit appearances sharing semantic tokens. Reuse the wordmark, object carousel, icons, dialogs, cards, and chips. Desktop game tables and primary decisions must fit together above the fold; move secondary chat below. Support mobile, keyboard focus, and reduced motion. Preserve game rules and music playback architecture, tracks, and preferences; music interface extensions must reuse the single AppProvider.
+Follow `docs/DESIGN_SYSTEM.md`: clear acrylic Aero Garden with shared day/moonlit tokens. Keep desktop table and decisions above the fold, with bounded chat on the right; mobile flows vertically. Carousel objects launch through the shared callback; only object hitboxes intercept wheel input. Support keyboard/touch and reduced motion. Keep engine authority separate from motion, and preserve the single AppProvider music system.
 
 ## Economy, Audio & Safety
 

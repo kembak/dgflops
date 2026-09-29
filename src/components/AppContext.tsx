@@ -6,7 +6,7 @@ import { playEffect, setEffectsVolume, type EffectName } from "@/lib/audio";
 import catalog from "@/lib/music-catalog.json";
 import { AudioDock } from "./AudioDock";
 
-export type User = { id: string; username: string; guest: boolean; chips: number; gamesPlayed: number; wins: number };
+export type User = { id: string; username: string; guest: boolean; chips: number; gamesPlayed: number; wins: number; role?: "player" | "admin" };
 export type Progress = { xp: number; earned: { id: string; earned_at: string }[]; history: { kind: string; chips_delta: number; xp: number; note: string; created_at: string }[];
   catalog: { id: string; title: string; description: string; chips: number; xp: number }[] };
 type Track = { id: string; src: string; scope: string; title: string; artist: string; image: string | null };

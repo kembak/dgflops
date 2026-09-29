@@ -11,7 +11,11 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "tsx --tsconfig tests/tsconfig.json --test tests/*.test.tsx",
-    "test:smoke": "node scripts/smoke-ui.mjs"
+    "test:smoke": "node scripts/smoke-ui.mjs",
+    "db:status": "tsx scripts/database.ts",
+    "db:migrate": "tsx scripts/database.ts --migrate",
+    "admin:bootstrap": "tsx scripts/bootstrap-admin.ts",
+    "test:api": "node scripts/test-api.mjs"
   },
   "dependencies": {
     "@libsql/client": "^0.18.0",

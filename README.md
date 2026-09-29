@@ -4,7 +4,7 @@ DG Flops is a social, fun-play casino built with Next.js and TypeScript. Chips h
 
 ## Run locally
 
-Use Node.js 20.9 or newer. Without Turso variables, the app uses local SQLite at `data/dgflops.sqlite`. An existing `data/dgflops.json` is imported once if that SQLite store is empty; retain the JSON file as a backup.
+Use Node.js 20.9 or newer. Pull the Vercel development variables into `.env.local` to use Turso, or explicitly put `DG_DATABASE_MODE=local` in that file for independent SQLite development. Missing configuration fails safely rather than silently switching databases. Existing local SQLite/legacy JSON records are preserved. See [database setup and migration safety](docs/DATABASE.md).
 
 ```bash
 npm install
@@ -29,17 +29,17 @@ FLOPSTORAGE_TURSO_DATABASE_URL
 FLOPSTORAGE_TURSO_AUTH_TOKEN
 ```
 
-The connected Turso database is initialized automatically on the first server request. Never prefix these variables with `NEXT_PUBLIC_` or commit their values. To test Turso locally, pull the Vercel development environment with `vercel env pull .env.local` (Vercel CLI login required), then run `npm run dev`. Without that file, local SQLite remains usable. Vercel deployments must not use filesystem persistence. Redeploy after changing environment variables.
+The connected Turso database is initialized non-destructively on the first server request. Never prefix these variables with `NEXT_PUBLIC_` or commit their values. Pull with `vercel env pull .env.local` (Vercel CLI login required), remove any local-mode override, and restart. `npm run db:status` identifies the target without exposing secrets; `npm run db:migrate` applies additive v2 metadata with a retained migration backup. Vercel must not use filesystem persistence. Redeploy after variable changes.
 
 Contributor conventions are in [AGENTS.md](AGENTS.md).
 
 ## Interface architecture
 
-The Aero Garden design is specified in [the design system](docs/DESIGN_SYSTEM.md). Clear molded acrylic, original outlined lettering, and a manually operated 3D game-object carousel share day-garden and moonlit-lagoon tokens. The appearance selector follows the system by default and remembers explicit choices. Desktop tables put decisions beside the playing surface; mobile uses natural vertical flow. Game engines, API contracts, persistence, and music playback remain unchanged.
+The Aero Garden design is specified in [the design system](docs/DESIGN_SYSTEM.md). Clear acrylic game objects share day-garden/moonlit-lagoon tokens. The appearance menu follows the system by default. Desktop tables keep decisions below the playing surface and bounded chat on the right; mobile uses natural vertical flow. [Architecture and supported rules](docs/ARCHITECTURE.md) explain authoritative games, reconnects, account relationships, and administration. Music playback remains unchanged.
 
 The top music strip scrolls with the page. The floating receiver can be hidden/restored without stopping playback; both presentations control the same audio element. Its visibility preference is separate from audio preferences. With no saved visibility preference, tables start with the receiver collapsed to keep the play area clear.
 
-`npm test` runs presentation regression tests (not a complete game-engine suite). Run `npm run start -- -p 3002` and then `npm run test:smoke` for read-only HTTP checks; set `SMOKE_BASE_URL` for a different port. Browser acceptance checks and outstanding verification are listed in [UI verification](docs/UI_VERIFICATION.md).
+`npm test` covers engines, persistence/authorization, carousel input, and presentation. Run `npm run start -- -p 3002` then `npm run test:smoke` for read-only HTTP checks; set `SMOKE_BASE_URL` for a different port. Browser checks are recorded in [UI verification](docs/UI_VERIFICATION.md). To bootstrap administration, create the intended account, verify the database fingerprint, then run `npm run admin:bootstrap -- ExactUsername`; later role changes require an existing admin and an audit reason.
 
 ## Music and sound
 

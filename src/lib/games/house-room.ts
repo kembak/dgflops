@@ -6,27 +6,30 @@ export type Seat = { id: string; name: string };
 export type HouseBet = { amount: number; side?: BaccaratSide; play: number; folded: boolean; doubled: boolean };
 export type Settlement = { userId: string; payout: number; wagered: number; net: number; note: string };
 export type Effect = { transfers: { userId: string; chips: number }[]; results: Settlement[] };
+export type EngineInput = { now?: number; shoe?: Card[] };
+export type BlackjackHand = { cards: Card[]; amount: number; doubled: boolean; split: boolean; done: boolean };
 export type HouseState = {
   kind: "house"; game: HouseGame; phase: "betting" | "playing" | "finished";
   seats: Seat[]; bets: Record<string, HouseBet>; hands: Record<string, Card[]>;
   dealer: Card[]; board: Card[]; shoe: Card[]; turn: string | null;
   stage: "preflop" | "flop" | "river" | null; acted: string[];
   result: string; round: number; deadline: number;
+  settlements?: Settlement[]; blackjackHands?: Record<string, BlackjackHand[]>; handIndex?: Record<string, number>;
 };
 
 const emptyEffect = (): Effect => ({ transfers: [], results: [] });
 const stake = (bet: HouseBet, game: HouseGame) => game === "ultimate" ? bet.amount * 2 + bet.play : bet.amount * (bet.doubled ? 2 : 1);
 
 export function newHouseState(game: HouseGame): HouseState {
-  return { kind: "house", game, phase: "betting", seats: [], bets: {}, hands: {}, dealer: [], board: [], shoe: [], turn: null, stage: null, acted: [], result: "Place a wager to begin.", round: 0, deadline: 0 };
+  return { kind: "house", game, phase: "betting", seats: [], bets: {}, hands: {}, dealer: [], board: [], shoe: [], turn: null, stage: null, acted: [], result: "Place a wager to begin.", round: 0, deadline: 0, settlements: [], blackjackHands: {}, handIndex: {} };
 }
 
 function active(state: HouseState): string[] { return state.seats.map((seat) => seat.id).filter((id) => !!state.bets[id]); }
-function nextBlackjack(state: HouseState, after = ""): void {
+function nextBlackjack(state: HouseState, now: number, after = ""): void {
   const ids = active(state);
   const start = Math.max(0, ids.indexOf(after) + 1);
   state.turn = ids.slice(start).find((id) => blackjackTotal(state.hands[id]).total < 21) || null;
-  if (state.turn) { state.deadline = Date.now() + 60000; return; }
+  if (state.turn) { state.deadline = now + 60000; return; }
   while (blackjackTotal(state.dealer).total < 17) state.dealer.push(take(state.shoe, 1)[0]);
   state.phase = "finished";
 }
@@ -39,7 +42,8 @@ function finish(state: HouseState, effect: Effect): void {
     let payout = 0;
     let detail = "";
     if (state.game === "blackjack") {
-      payout = blackjackPayout(state.hands[id], state.dealer, bet.amount, bet.doubled);
+      const hands = state.blackjackHands?.[id];
+      payout = hands ? hands.reduce((sum, hand) => sum + blackjackPayout(hand.cards, state.dealer, hand.amount, hand.doubled, hand.split), 0) : blackjackPayout(state.hands[id], state.dealer, bet.amount, bet.doubled);
       detail = `${blackjackTotal(state.hands[id]).total} vs dealer ${blackjackTotal(state.dealer).total}`;
     } else if (state.game === "baccarat") {
       const winner = state.result as BaccaratSide;
@@ -50,25 +54,27 @@ function finish(state: HouseState, effect: Effect): void {
       payout = outcome.payout;
       detail = `${outcome.result}: ${outcome.hand}`;
     }
-    const wagered = stake(bet, state.game);
+    const wagered = state.game === "blackjack" && state.blackjackHands?.[id] ? state.blackjackHands[id].reduce((sum, hand) => sum + hand.amount * (hand.doubled ? 2 : 1), 0) : stake(bet, state.game);
     effect.transfers.push({ userId: id, chips: payout });
     effect.results.push({ userId: id, payout, wagered, net: payout - wagered, note: `${state.game}: ${detail}` });
   }
   state.result = effect.results.map((item) => `${state.seats.find((seat) => seat.id === item.userId)?.name}: ${item.net >= 0 ? "+" : ""}${item.net}`).join(" · ");
+  state.settlements = effect.results;
 }
 
-function advanceUltimate(state: HouseState, effect: Effect): void {
+function advanceUltimate(state: HouseState, effect: Effect, now: number): void {
   const pending = active(state).filter((id) => state.bets[id].play === 0 && !state.bets[id].folded);
   const next = pending.find((id) => !state.acted.includes(id));
-  if (next) { state.turn = next; state.deadline = Date.now() + 60000; return; }
+  if (next) { state.turn = next; state.deadline = now + 60000; return; }
   state.acted = [];
   if (state.stage === "preflop") state.stage = "flop";
   else if (state.stage === "flop") state.stage = "river";
   else { finish(state, effect); return; }
-  advanceUltimate(state, effect);
+  advanceUltimate(state, effect, now);
 }
 
-export function actHouse(state: HouseState, userId: string, action: string, amount = 0, side?: BaccaratSide): Effect {
+export function actHouse(state: HouseState, userId: string, action: string, amount = 0, side?: BaccaratSide, input: EngineInput = {}): Effect {
+  const now = input.now ?? Date.now();
   const effect = emptyEffect();
   const seated = state.seats.some((seat) => seat.id === userId);
   if (!seated) throw new Error("Join the table first.");
@@ -86,7 +92,7 @@ export function actHouse(state: HouseState, userId: string, action: string, amou
     if (state.phase !== "betting" || active(state).length === 0) throw new Error("At least one bet is needed.");
     state.phase = "playing";
     state.round++;
-    state.shoe = deck();
+    state.shoe = input.shoe ? structuredClone(input.shoe) : deck(state.game === "baccarat" ? 8 : state.game === "blackjack" ? 6 : 1);
     state.hands = {};
     if (state.game === "baccarat") {
       const outcome = baccaratRound(state.shoe);
@@ -97,7 +103,11 @@ export function actHouse(state: HouseState, userId: string, action: string, amou
     } else if (state.game === "blackjack") {
       for (const id of active(state)) state.hands[id] = take(state.shoe, 2);
       state.dealer = take(state.shoe, 2);
-      nextBlackjack(state);
+      state.blackjackHands = Object.fromEntries(active(state).map((id) => [id, [{ cards: state.hands[id], amount: state.bets[id].amount, doubled: false, split: false, done: false }]]));
+      state.handIndex = {};
+      // Peek before allowing extra wagers against a dealer natural.
+      if (blackjackTotal(state.dealer).total === 21) state.turn = null;
+      else nextBlackjack(state, now);
       if (!state.turn) finish(state, effect);
       else state.result = "Players take turns against the dealer.";
     } else {
@@ -106,7 +116,7 @@ export function actHouse(state: HouseState, userId: string, action: string, amou
       state.board = take(state.shoe, 5);
       state.stage = "preflop";
       state.acted = [];
-      advanceUltimate(state, effect);
+      advanceUltimate(state, effect, now);
       state.result = "Choose when to make your play bet.";
     }
     return effect;
@@ -121,16 +131,39 @@ export function actHouse(state: HouseState, userId: string, action: string, amou
   if (state.phase !== "playing" || state.turn !== userId) throw new Error("It is not your turn.");
   const bet = state.bets[userId];
   if (state.game === "blackjack") {
+    const hands = state.blackjackHands?.[userId];
+    const handIndex = state.handIndex?.[userId] || 0;
+    const hand = hands?.[handIndex];
+    const advanceHand = () => {
+      if (hand) hand.done = true;
+      const next = hands?.findIndex((item, i) => i > handIndex && !item.done && blackjackTotal(item.cards).total < 21) ?? -1;
+      if (next >= 0 && hands) { state.handIndex![userId] = next; state.hands[userId] = hands[next].cards; state.deadline = now + 60000; }
+      else nextBlackjack(state, now, userId);
+    };
+    // JSON snapshots do not retain reference identity; synchronize the active hand explicitly.
+    if (hand) state.hands[userId] = hand.cards;
     if (action === "hit") {
       state.hands[userId].push(take(state.shoe, 1)[0]);
-      if (blackjackTotal(state.hands[userId]).total >= 21) nextBlackjack(state, userId);
-    } else if (action === "stand") nextBlackjack(state, userId);
+      if (blackjackTotal(state.hands[userId]).total >= 21) advanceHand();
+    } else if (action === "stand") advanceHand();
+    else if (action === "split") {
+      const value = (card: Card) => card.rank === 14 ? 11 : Math.min(card.rank, 10);
+      if (!hand || !hands || hands.length >= 4 || hand.cards.length !== 2 || value(hand.cards[0]) !== value(hand.cards[1])) throw new Error("Split requires a pair and fewer than four hands.");
+      const aces = hand.cards[0].rank === 14;
+      const second = hand.cards.pop()!;
+      hand.split = true;
+      hand.cards.push(take(state.shoe, 1)[0]);
+      hands.splice(handIndex + 1, 0, { cards: [second, take(state.shoe, 1)[0]], amount: bet.amount, doubled: false, split: true, done: aces });
+      effect.transfers.push({ userId, chips: -bet.amount });
+      if (aces || blackjackTotal(hand.cards).total === 21) advanceHand();
+    }
     else if (action === "double") {
       if (state.hands[userId].length !== 2) throw new Error("Double is only available on your first two cards.");
       bet.doubled = true;
+      if (hand) hand.doubled = true;
       effect.transfers.push({ userId, chips: -bet.amount });
       state.hands[userId].push(take(state.shoe, 1)[0]);
-      nextBlackjack(state, userId);
+      advanceHand();
     } else throw new Error("Unknown blackjack action.");
     if (!state.turn) finish(state, effect);
     return effect;
@@ -139,12 +172,13 @@ export function actHouse(state: HouseState, userId: string, action: string, amou
     if (action === "check" && state.stage !== "river") state.acted.push(userId);
     else if (action === "fold" && state.stage === "river") { bet.folded = true; state.acted.push(userId); }
     else if (action === "raise") {
-      const multiplier = state.stage === "preflop" ? 4 : state.stage === "flop" ? 2 : 1;
+      if (state.stage === "preflop" && ![0, 3, 4].includes(amount)) throw new Error("Preflop play must be 3x or 4x ante.");
+      const multiplier = state.stage === "preflop" ? amount === 3 ? 3 : 4 : state.stage === "flop" ? 2 : 1;
       bet.play = bet.amount * multiplier;
       effect.transfers.push({ userId, chips: -bet.play });
       state.acted.push(userId);
     } else throw new Error("Invalid action for this stage.");
-    advanceUltimate(state, effect);
+    advanceUltimate(state, effect, now);
     return effect;
   }
   throw new Error("This game has no turn action.");

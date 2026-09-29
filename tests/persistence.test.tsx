@@ -1,0 +1,77 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { randomUUID } from "node:crypto";
+import { createClient } from "@libsql/client";
+import { databaseConfig } from "../src/lib/server/database-config";
+import { decodeState, migrateDatabase, mutate, read } from "../src/lib/server/store";
+import { register } from "../src/lib/server/auth";
+import { createRoom, getRoom, updateRoom } from "../src/lib/server/rooms";
+import { administer, adminOverview } from "../src/lib/server/admin";
+
+test("database configuration fails closed and fingerprints omit secrets", () => {
+  assert.throws(() => databaseConfig({}), /not configured/);
+  assert.throws(() => databaseConfig({ DG_DATABASE_MODE: "local", VERCEL: "1" }));
+  assert.throws(() => databaseConfig({ FLOPSTORAGE_TURSO_DATABASE_URL: "file:bad" }));
+  assert.throws(() => databaseConfig({ FLOPSTORAGE_TURSO_DATABASE_URL: "file:bad", FLOPSTORAGE_TURSO_AUTH_TOKEN: "secret" }));
+  assert.equal(databaseConfig({ FLOPSTORAGE_TURSO_DATABASE_URL: "libsql://test.turso.io", FLOPSTORAGE_TURSO_AUTH_TOKEN: "secret" }).mode, "turso");
+  assert.equal(databaseConfig({ DG_DATABASE_MODE: "local" }).mode, "local");
+});
+test("malformed and future snapshots never reset to an empty database", () => {
+  assert.throws(() => decodeState("{}")); assert.throws(() => decodeState("not json"));
+  assert.throws(() => decodeState(JSON.stringify({ users: {}, sessions: {}, rooms: {}, ledger: [], achievements: [], messages: [], schemaVersion: 99 })));
+});
+test("isolated database preserves accounts, history, migrations, permissions, idempotency and departures", async () => {
+  process.env.DG_DATABASE_MODE = "local";
+  process.env.DG_SQLITE_PATH = join(mkdtempSync(join(tmpdir(), "dgflops-test-")), "state.sqlite");
+  delete process.env.FLOPSTORAGE_TURSO_DATABASE_URL; delete process.env.FLOPSTORAGE_TURSO_AUTH_TOKEN; delete process.env.VERCEL;
+  const a = (await register("AliceTest", "test-only-password")).user;
+  const b = (await register("BobTest", "test-only-password")).user;
+  await assert.rejects(adminOverview(a.id), /Administrator/);
+  const room = await createRoom(a, "blackjack", "house", "solo");
+  let view = await getRoom(a, room.id);
+  const op = { id: randomUUID(), version: view.version };
+  view = await updateRoom(a, room.id, "bet", 100, undefined, op);
+  await updateRoom(a, room.id, "bet", 100, undefined, op);
+  assert.equal(await read((s) => s.users[a.id].chips), 9900);
+  await assert.rejects(updateRoom(a, room.id, "start", 0, undefined, { id: randomUUID(), version: op.version }), /changed/);
+  await assert.rejects(getRoom(b, room.id), /code/);
+  await updateRoom(a, room.id, "leave"); // Betting escrow refunded; solo/private response must not roll back.
+  assert.equal(await read((s) => s.users[a.id].chips), 10000);
+  const publicRoom = await createRoom(a, "holdem", "cash", "public");
+  await updateRoom(b, publicRoom.id, "join"); await updateRoom(b, publicRoom.id, "join");
+  assert.equal((await getRoom(a, publicRoom.id)).state.kind, "poker");
+  await updateRoom(a, publicRoom.id, "start");
+  await updateRoom(a, publicRoom.id, "leave");
+  let resumed = await getRoom(b, publicRoom.id);
+  if (resumed.state.turn) await updateRoom(b, publicRoom.id, "fold");
+  resumed = await getRoom(b, publicRoom.id);
+  assert.equal(resumed.state.kind === "poker" && resumed.state.players.some((p) => p.id === a.id), false);
+  assert.ok(await read((s) => (s.history?.length || 0) > 0));
+  await assert.rejects(administer(b.id, "grant-admin", b.id, "attempt access"));
+  await mutate((s) => { s.users[a.id].role = "admin"; }); // Isolated fixture only; never run on the actual app store.
+  await assert.rejects(administer(a.id, "revoke-admin", a.id, "last admin test"), /last active/);
+  await administer(a.id, "grant-admin", b.id, "second administrator test");
+  const before = await read((s) => ({ users: s.users, ledger: s.ledger, history: s.history }));
+  await migrateDatabase(); await migrateDatabase();
+  assert.deepEqual(await read((s) => ({ users: s.users, ledger: s.ledger, history: s.history })), before);
+  const independent = createClient({ url: `file:${process.env.DG_SQLITE_PATH}` });
+  const snapshot = await independent.execute("SELECT data FROM app_state WHERE id=1");
+  assert.equal(decodeState(String(snapshot.rows[0].data)).users[b.id].role, "admin");
+  assert.equal((await independent.execute("SELECT COUNT(*) AS count FROM migration_backups")).rows[0].count, 1);
+  independent.close();
+  await administer(a.id, "close-table", publicRoom.id, "safely close fixture table");
+  assert.ok((await getRoom(b, publicRoom.id)).closedAt);
+  const wallet = await read((s) => s.users[b.id].chips);
+  await administer(a.id, "close-table", publicRoom.id, "repeat close is harmless");
+  assert.equal(await read((s) => s.users[b.id].chips), wallet);
+  await administer(a.id, "suspend", b.id, "moderation fixture test");
+  await assert.rejects(adminOverview(b.id));
+  assert.ok((await adminOverview(a.id)).audit.length >= 3);
+  const ledgerBeforeReset = await read((s) => structuredClone(s.ledger));
+  await mutate((s) => { s.users[a.id].resetDay = "2000-01-01"; s.users[a.id].chips = 7; });
+  assert.equal(await read((s) => s.users[a.id].chips), 10000);
+  assert.deepEqual(await read((s) => s.ledger), ledgerBeforeReset);
+});

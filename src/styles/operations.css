@@ -1,0 +1,20 @@
+.theme-control { position: relative; }
+.theme-trigger { display: flex; align-items: center; gap: 7px; min-height: 44px; padding: 7px 12px; color: var(--ink); border: 1px solid var(--rim); border-radius: 17px 8px; background: var(--acrylic); box-shadow: var(--acrylic-shadow); }
+.theme-trigger > span:first-child { font-size: 22px; color: var(--sky); }
+.theme-trigger > span:nth-child(2) { font-size: 11px; }
+.theme-menu { position: absolute; z-index: 50; top: calc(100% + 8px); right: 0; width: 275px; padding: 7px; border: 1px solid var(--rim); border-radius: 22px 10px; background: var(--glass); box-shadow: var(--shadow-float); }
+.theme-menu button { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 66px; padding: 9px; border: 1px solid transparent; border-radius: 15px 7px; background: transparent; color: var(--ink); text-align: left; }
+.theme-menu i { font-style: normal; font-size: 25px; display: grid; place-items: center; width: 37px; height: 37px; border-radius: 50%; background: var(--pearl); box-shadow: var(--shadow-sm); color: var(--sky); }
+.theme-menu strong { font-size: 12px; }
+.theme-menu small { display: block; margin-top: 3px; color: var(--muted); font-size: 10px; }
+.theme-menu b { margin-left: auto; color: var(--leaf); }
+.theme-menu button[aria-checked="true"], .theme-menu button:hover { background: var(--surface); border-color: var(--line); }
+.admin-page > .panel { margin: 18px 0; }
+.admin-table-scroll { overflow-x: auto; }
+.admin-page table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.admin-page th, .admin-page td { text-align: left; padding: 12px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.admin-page small { display: block; color: var(--muted); overflow-wrap: anywhere; margin-top: 4px; }
+.admin-page td button { font-size: 11px; margin: 3px; }
+.admin-records { max-height: 320px; overflow-y: auto; }
+.admin-records p { font-size: 12px; border-bottom: 1px solid var(--line); padding-bottom: 9px; }
+@media (max-width: 600px) { .theme-trigger > span:nth-child(2) { display: none; } .theme-trigger { padding-inline: 9px; } .theme-menu { right: -70px; width: 265px; } }

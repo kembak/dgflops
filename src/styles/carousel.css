@@ -1,7 +1,9 @@
 /* Floating miniature tables: no capsule cards, blur filters, or endless animation. */
-.game-carousel { --orbit-step: clamp(155px, 18.5vw, 270px); --object-width: clamp(230px, 20vw, 270px); position: relative; }
+.game-carousel { --orbit-step: clamp(155px, 17vw, 232px); --object-width: clamp(210px, 18vw, 245px); position: relative; max-width: 1220px; margin-inline: auto; }
 .carousel-stage { position: relative; height: 405px; perspective: 1400px; touch-action: pan-y; overflow: hidden; overflow: clip; isolation: isolate; cursor: grab; user-select: none; }
 .carousel-stage[data-dragging] { cursor: grabbing; }
+.carousel-object { touch-action: pan-y; }
+.carousel-object:not(:active) { cursor: pointer; }
 .carousel-waterline { position: absolute; inset: 55% 3% 10%; border-radius: 50%; background: radial-gradient(ellipse, #63d6ed25, transparent 70%); border-bottom: 1px solid var(--rim); transform: rotateX(62deg); pointer-events: none; }
 .showcase-atmosphere { position: absolute; inset: 0; z-index: -1; background: radial-gradient(ellipse at 50% 45%, #b9f5ed55, transparent 50%), radial-gradient(circle at 11% 75%, #ffffff90 0 2px, transparent 3px), radial-gradient(circle at 84% 18%, #ffffff90 0 3px, transparent 4px); pointer-events: none; }
 .carousel-object { position: absolute; left: calc(50% - var(--object-width) / 2); top: 44px; width: var(--object-width); padding: 0 0 10px; border: 0; background: transparent; color: var(--ink-strong); transform: translateX(calc(var(--position) * var(--orbit-step) + var(--drag-x, 0px))) translateY(calc(var(--distance) * 16px)) translateZ(calc(45px - var(--distance) * 65px)) rotateY(calc(var(--position) * -5deg)); z-index: calc(5 - var(--distance)); transition: transform 480ms var(--ease-out); cursor: inherit; -webkit-user-drag: none; }

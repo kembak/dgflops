@@ -22,6 +22,6 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, []);
   return <div className={`app-environment ${inRoom ? "game-environment" : ""}`}>
     <a className="skip-link" href="#main-content">Skip to content</a>
-    <div className="shell"><SiteHeader /><MusicBar />{children}<footer className="site-footer"><Link className="footer-brand" href="/"><Wordmark compact /></Link><span><Icon name="leaf" /> Produsert av Harald-IT-lærer's ånd.</span><small>© {new Date().getFullYear()} · Ingen ekte penger</small></footer></div>
+    <div className="shell"><SiteHeader /><MusicBar />{children}<footer className="site-footer"><Link className="footer-brand" href="/"><Wordmark compact /></Link><span><Icon name="leaf" /> Produsert av Harald-IT-lærer&apos;s ånd.</span><small>© {new Date().getFullYear()} · Ingen ekte penger</small></footer></div>
   </div>;
 }

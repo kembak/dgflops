@@ -21,7 +21,8 @@ export async function POST(request: NextRequest, context: Context) {
     const body = await request.json();
     const id = (await context.params).id;
     const result = body.action === "chat" ? await sendMessage(user, id, String(body.body || ""))
-      : await updateRoom(user, id, String(body.action || ""), Number(body.amount || 0), body.side as BaccaratSide);
+      : await updateRoom(user, id, String(body.action || ""), Number(body.amount || 0), body.side as BaccaratSide,
+        body.action === "tick" ? undefined : { id: String(body.actionId || ""), version: Number(body.version) });
     return NextResponse.json(result);
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Request failed." }, { status: 400 });

@@ -8,11 +8,11 @@ export function blackjackTotal(cards: Card[]): { total: number; soft: boolean } 
   return { total, soft };
 }
 
-export function blackjackPayout(player: Card[], dealer: Card[], wager: number, doubled = false): number {
+export function blackjackPayout(player: Card[], dealer: Card[], wager: number, doubled = false, split = false): number {
   const mine = blackjackTotal(player).total;
   const theirs = blackjackTotal(dealer).total;
   const stake = doubled ? wager * 2 : wager;
-  const natural = player.length === 2 && mine === 21 && !doubled;
+  const natural = player.length === 2 && mine === 21 && !doubled && !split;
   const dealerNatural = dealer.length === 2 && theirs === 21;
   if (mine > 21) return 0;
   if (natural && !dealerNatural) return Math.floor(wager * 2.5);
@@ -22,12 +22,14 @@ export function blackjackPayout(player: Card[], dealer: Card[], wager: number, d
 }
 
 export type BaccaratSide = "player" | "banker" | "tie";
-function point(card: Card): number { return card.rank >= 10 ? 0 : card.rank; }
+function point(card: Card): number { return card.rank === 14 ? 1 : card.rank >= 10 ? 0 : card.rank; }
 export function baccaratTotal(cards: Card[]): number { return cards.reduce((sum, card) => sum + point(card), 0) % 10; }
 
 export function baccaratRound(cards = deck()): { player: Card[]; banker: Card[]; winner: BaccaratSide } {
-  const player = [take(cards, 1)[0], take(cards, 1)[0]];
-  const banker = [take(cards, 1)[0], take(cards, 1)[0]];
+  const player = [take(cards, 1)[0]];
+  const banker = [take(cards, 1)[0]];
+  player.push(take(cards, 1)[0]);
+  banker.push(take(cards, 1)[0]);
   const p = baccaratTotal(player);
   const b = baccaratTotal(banker);
   if (p < 8 && b < 8) {

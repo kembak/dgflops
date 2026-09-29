@@ -4,11 +4,11 @@ export type Suit = "♠" | "♥" | "♦" | "♣";
 export type Card = { rank: number; suit: Suit };
 export const suits: Suit[] = ["♠", "♥", "♦", "♣"];
 
-export function deck(): Card[] {
+export function deck(copies = 1, random = randomInt): Card[] {
   const cards: Card[] = [];
-  for (const suit of suits) for (let rank = 2; rank <= 14; rank++) cards.push({ rank, suit });
+  for (let copy = 0; copy < copies; copy++) for (const suit of suits) for (let rank = 2; rank <= 14; rank++) cards.push({ rank, suit });
   for (let i = cards.length - 1; i > 0; i--) {
-    const j = randomInt(i + 1);
+    const j = random(i + 1);
     [cards[i], cards[j]] = [cards[j], cards[i]];
   }
   return cards;

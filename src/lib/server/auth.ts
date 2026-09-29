@@ -3,11 +3,11 @@ import type { NextRequest } from "next/server";
 import { mutate, read, utcDay, type State, type UserRecord } from "./store";
 import { checkLoginAchievements } from "./economy";
 
-export type Actor = { id: string; username: string; guest: boolean; chips: number; gamesPlayed: number; wins: number };
+export type Actor = { id: string; username: string; guest: boolean; chips: number; gamesPlayed: number; wins: number; role?: "player" | "admin" };
 const cookieName = "dgflops_session";
 const hash = (value: string) => createHash("sha256").update(value).digest("hex");
 const actor = (user: UserRecord): Actor => ({ id: user.id, username: user.username || `Guest ${user.id.slice(0, 4)}`,
-  guest: user.guest, chips: user.chips, gamesPlayed: user.gamesPlayed, wins: user.wins });
+  guest: user.guest, chips: user.chips, gamesPlayed: user.gamesPlayed, wins: user.wins, role: user.role || "player" });
 
 export async function getActor(request: NextRequest): Promise<Actor | null> {
   const token = request.cookies.get(cookieName)?.value;
@@ -15,7 +15,7 @@ export async function getActor(request: NextRequest): Promise<Actor | null> {
   return read((state) => {
     const session = state.sessions[hash(token)];
     const user = session?.expiresAt > new Date().toISOString() ? state.users[session.userId] : null;
-    return user ? actor(user) : null;
+    return user && !user.suspended ? actor(user) : null;
   });
 }
 
@@ -60,7 +60,7 @@ export async function register(username: string, password: string) {
 export async function login(username: string, password: string) {
   return mutate((state) => {
     const user = Object.values(state.users).find((item) => !item.guest && item.username?.toLowerCase() === username.toLowerCase());
-    if (!user || !user.salt || !user.passwordHash || !verifyPassword(password, user.salt, user.passwordHash)) throw new Error("Invalid username or password.");
+    if (!user || user.suspended || !user.salt || !user.passwordHash || !verifyPassword(password, user.salt, user.passwordHash)) throw new Error("Invalid username or password.");
     const day = utcDay();
     if (user.lastLoginDay !== day) { user.loginDays++; user.lastLoginDay = day; }
     checkLoginAchievements(state, user.id);

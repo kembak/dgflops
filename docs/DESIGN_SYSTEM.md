@@ -14,6 +14,10 @@ Research sources:
 
 ## Materials and tokens
 
+### Current gameplay refinement intent
+
+Preserve Aero Garden and the existing music architecture. Refine playable tables with textured lagoon felt, acrylic rails, dealer origins, chip/bet zones, explicit turn/result states, and travel/flip motion driven only by authoritative snapshots. Desktop composition puts table and decisions together on the left and bounded, internally scrolling chat on the right; mobile flows naturally. New results include structured payout/net information rather than parsing display strings. Carousel wheel capture is restricted to actual game objects, swipe preserves vertical scrolling, and each object shares the launch callback. Theme options become a labeled acrylic menu with unchanged light/dark/system persistence.
+
 Use deep ocean ink for text, sky/cyan for primary controls, leaf green for positive state and social presence, warm amber for chips and rewards, and coral for errors. Keep reading surfaces substantially opaque. Glass appears on surrounds and hardware, never behind dense low-contrast text. Consistent top-left highlights, narrow reflective rims, and restrained contact shadows establish depth. No purple gradients, black casino panels, wood rails, or pervasive neon.
 
 The system font stack starts with Segoe UI, then humanist system fallbacks. Large headings use normal letter spacing and balanced line height; tabular numerals keep chips and scores stable. No external font request is required.

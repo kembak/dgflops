@@ -28,6 +28,7 @@ export function GameCarousel({ items, onLaunch }: { items: readonly Game[]; onLa
     const gesture = newWheelGesture();
     function wheel(event: WheelEvent) {
       if (event.ctrlKey || !event.cancelable || (!event.deltaX && !event.deltaY)) return;
+      if (!(event.target instanceof Element) || !event.target.closest(".carousel-object")) return;
       event.preventDefault();
       const step = wheelStep(gesture, event.deltaX, event.deltaY, event.deltaMode, performance.now());
       if (step) setSelectedId((previous) => {
@@ -66,13 +67,13 @@ export function GameCarousel({ items, onLaunch }: { items: readonly Game[]; onLa
       const dx = event.clientX - start.x, dy = event.clientY - start.y;
       if (!start.moved && Math.abs(dx) > 9 && Math.abs(dx) > Math.abs(dy) * 1.25) { start.moved = true; event.currentTarget.setPointerCapture(event.pointerId); }
       if (start.moved) { event.currentTarget.dataset.dragging = "true"; event.currentTarget.style.setProperty("--drag-x", `${Math.max(-38, Math.min(38, dx * .22))}px`); }
-    }} onPointerUp={(event) => finishDrag(event)} onPointerCancel={(event) => finishDrag(event, true)} onLostPointerCapture={(event) => { if (drag.current) finishDrag(event, true); }}>
+    }} onPointerUp={(event) => finishDrag(event)} onPointerCancel={(event) => finishDrag(event, true)} onLostPointerCapture={(event) => { if (event.target === event.currentTarget && drag.current) finishDrag(event, true); }}>
       <div className="carousel-waterline" aria-hidden="true" /><div className="showcase-atmosphere" aria-hidden="true" />
       {items.map((game, index) => {
         let distance = index - selected;
         if (distance > items.length / 2) distance -= items.length;
         if (distance < -items.length / 2) distance += items.length;
-        return <button key={game.id} ref={(element) => { objectButtons.current[game.id] = element; }} className={`carousel-object ${index === selected ? "is-selected" : ""}`} data-distance={Math.abs(distance)} data-accent={game.accent} style={{ "--position": distance, "--distance": Math.abs(distance) } as CSSProperties} aria-label={`Select ${game.name}`} aria-pressed={index === selected} tabIndex={index === selected ? 0 : -1} onClick={() => { if (performance.now() >= suppressClickUntil.current) choose(index); }} data-sound="select">
+        return <button key={game.id} ref={(element) => { objectButtons.current[game.id] = element; }} className={`carousel-object ${index === selected ? "is-selected" : ""}`} data-distance={Math.abs(distance)} data-accent={game.accent} style={{ "--position": distance, "--distance": Math.abs(distance) } as CSSProperties} aria-label={`Open ${game.name}`} aria-pressed={index === selected} tabIndex={index === selected ? 0 : -1} onClick={() => { if (performance.now() >= suppressClickUntil.current) onLaunch(game); }} data-sound="select">
           <span className="object-sculpture"><span className="sculpture-aura" /><CarouselTable game={game.id} /></span><span className="object-name">{game.name}</span>
         </button>;
       })}
@@ -84,6 +85,6 @@ export function GameCarousel({ items, onLaunch }: { items: readonly Game[]; onLa
       <button className="primary-button carousel-launch" onClick={() => onLaunch(current)} data-sound="select" title={`Play ${current.name}`}><span>Play {current.name}</span><Icon name="arrow" /></button>
     </div>
     <div className="carousel-selectors" role="group" aria-label="Choose a game">{items.map((game, index) => <button key={game.id} data-accent={game.accent} aria-pressed={selected === index} onClick={() => choose(index)} data-sound="select"><i aria-hidden="true" />{game.name}</button>)}</div>
-    <p className="carousel-hint">Scroll or drag the showcase · Use ← → or Home / End · Select a game to explore</p>
+    <p className="carousel-hint">Scroll over a game or swipe to browse · ← → / Home / End · Click a game to play</p>
   </div>;
 }

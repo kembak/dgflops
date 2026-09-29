@@ -2,6 +2,19 @@
 
 This file tracks the work toward the first playable release described in `docs/PRODUCT.md`.
 
+## Casino systems overhaul — 2026-09-29
+
+- [x] Read repository guidance and trace engines, persistence, authentication, transport, and presentation.
+- [ ] Harden database selection, additive snapshot migrations, safe diagnostics, and preservation tests.
+- [ ] Repair house/poker rules with deterministic inputs and regression tests.
+- [ ] Add versioned/idempotent actions, reconnect lifecycle, safe leave/close, and history.
+- [ ] Add server-authorized roles, admin overview/actions, and durable audit records.
+- [ ] Refine tables, state-driven motion/results, bounded desktop chat, and responsive controls.
+- [ ] Repair carousel hitbox/swipe/launch and replace the theme selector interface.
+- [ ] Exercise browser flows, run all checks, and reconcile documentation with measured results.
+
+Audit findings: no `.env.local` or Turso variables are present in this checkout's shell; the existing local SQLite contains records. Silent local fallback explains an apparent database switch, not proven remote deletion. Startup uses `CREATE IF NOT EXISTS`/`INSERT OR IGNORE`, not drops. Preserve both stores; do not merge or overwrite remote records automatically. Engine findings include baccarat ace scoring, tournament continuation, short-all-in reopening, private leave response authorization, and missing operation deduplication.
+
 ## Aero Garden redesign — active
 
 ### Carousel-only refinement — 2026-09-29

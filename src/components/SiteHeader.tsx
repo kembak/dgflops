@@ -51,6 +51,7 @@ export function SiteHeader() {
       <nav className="main-nav" aria-label="Main navigation">{navigation.map((item) => <Link key={item.href} href={item.href} data-sound="navigate" aria-current={pathname === item.href ? "page" : undefined}><Icon name={item.icon} /><span>{item.label}</span></Link>)}</nav>
       <div className="header-actions">
         <ThemeControl />
+        {user?.role === "admin" && <Link className="text-button" href="/admin">Admin</Link>}
         {user && <span className="chip-pill" title="Fun-play chips"><Icon name="chip" /><strong>{user.chips.toLocaleString()}</strong><small>chips</small></span>}
         <button className="account-button" onClick={() => setOpen(true)} data-sound="select"><Icon name="user" /><span>{user ? user.username : "Sign in"}</span></button>
       </div>
